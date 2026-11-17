@@ -4,14 +4,15 @@
 /// caller reports an edible leaf in reach. Route choice stays with the insect
 class StickInsectAppetite {
   static const _mealSeconds = 1.5;
+  static const _biteSeconds = 0.5;
   static const _betweenMeals = 12.0;
 
   // Let a fresh specimen get hungry during its first branch rest
   double _untilHungry = 4;
   double _mealProgress = 0;
 
-  /// Returns whether to hold the insect at the sprig and whether a meal finished
-  ({bool feeding, bool finished}) advance(
+  /// Reports a held feeding pose, a visible bite, or a completed meal
+  ({bool feeding, bool bitLeaf, bool finished}) advance(
     double seconds, {
     required bool leafInReach,
   }) {
@@ -21,16 +22,19 @@ class StickInsectAppetite {
       seconds = -_untilHungry;
     }
     if (!leafInReach || seconds <= 0) {
-      return (feeding: false, finished: false);
+      return (feeding: false, bitLeaf: false, finished: false);
     }
 
+    final hadBitten = _mealProgress >= _biteSeconds;
     _mealProgress += seconds;
     if (_mealProgress < _mealSeconds) {
-      return (feeding: true, finished: false);
+      // Change the sprig picture only on the first tick that crosses the bite
+      final bitLeaf = !hadBitten && _mealProgress >= _biteSeconds;
+      return (feeding: true, bitLeaf: bitLeaf, finished: false);
     }
 
     _mealProgress = 0;
     _untilHungry = _betweenMeals;
-    return (feeding: true, finished: true);
+    return (feeding: true, bitLeaf: false, finished: true);
   }
 }

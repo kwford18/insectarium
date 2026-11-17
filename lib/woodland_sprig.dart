@@ -41,7 +41,14 @@ class WoodlandSprig extends Component {
   void render(ui.Canvas canvas) {
     final anchor = _anchor;
     if (anchor != null) {
-      _art.draw(canvas, anchor, _scale, feeding.eatenLeaves, uphill: uphill);
+      _art.draw(
+        canvas,
+        anchor,
+        _scale,
+        feeding.eatenLeaves,
+        hasBite: feeding.hasBite,
+        uphill: uphill,
+      );
     }
   }
 

@@ -75,8 +75,12 @@ void main() {
     expect(journal.recentActivity, isEmpty);
     insect.update(1);
     expect(journal.behaviorLabel, 'Feeding');
+    expect(feeding.hasBite, isTrue);
+    expect(feeding.eatenLeaves, 0);
+    expect(journal.recentActivity, isEmpty);
     insect.update(0.6);
     expect(feeding.eatenLeaves, 1);
+    expect(feeding.hasBite, isFalse);
 
     insect.update(2);
     expect(journal.behaviorLabel, 'Climbing');

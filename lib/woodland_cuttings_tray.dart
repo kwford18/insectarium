@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import 'woodland_sprig.dart';
@@ -19,7 +21,43 @@ class WoodlandCuttingsTray extends StatefulWidget {
 }
 
 class _WoodlandCuttingsTrayState extends State<WoodlandCuttingsTray> {
+  final _feedbackKey = GlobalKey();
   bool _dragging = false;
+  WoodlandSprig? _highlightedSprig;
+
+  WoodlandSprig? _sprigAt(Offset globalPointer) {
+    final preview = _feedbackKey.currentContext?.findRenderObject();
+    if (preview is! RenderBox || !preview.hasSize) return null;
+    final viewport = context.findRenderObject()! as RenderBox;
+    final pointer = viewport.globalToLocal(globalPointer);
+    final radius = preview.size.height / 2;
+    final center = pointer - Offset(0, radius);
+    final halfSegment = math.max(0.0, preview.size.width / 2 - radius);
+    WoodlandSprig? closest;
+    var closestDistance = double.infinity;
+    for (final sprig in widget.sprigs) {
+      final bounds = sprig.dropBounds;
+      if (bounds == null) continue;
+      // Treat the preview as its visible pill shape. A stem's circle overlaps
+      // it when its center is within the combined radii of the pill's centerline
+      final delta = bounds.center - center;
+      final lineOffset = Offset(
+        math.max(0.0, delta.dx.abs() - halfSegment),
+        delta.dy,
+      );
+      final reach = radius + bounds.width / 2;
+      if (lineOffset.distanceSquared <= reach * reach &&
+          delta.distanceSquared < closestDistance) {
+        closest = sprig;
+        closestDistance = delta.distanceSquared;
+      }
+    }
+    return closest;
+  }
+
+  void _highlight(WoodlandSprig? sprig) {
+    if (_highlightedSprig != sprig) setState(() => _highlightedSprig = sprig);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,31 +65,39 @@ class _WoodlandCuttingsTrayState extends State<WoodlandCuttingsTray> {
       fit: StackFit.expand,
       children: [
         if (_dragging)
-          for (final sprig in widget.sprigs)
-            if (sprig.dropBounds case final bounds?)
-              Positioned.fromRect(
-                rect: bounds,
-                child: DragTarget<_Cutting>(
-                  onWillAcceptWithDetails: (_) => true,
-                  // Accepting a drop is the only action that changes foliage.
-                  // A canceled drag just hides the targets again
-                  onAcceptWithDetails: (_) => sprig.feeding.replenish(),
-                  builder: (context, candidates, _) => DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: candidates.isEmpty
-                          ? Colors.transparent
-                          : const Color.from(
-                              alpha: 0.32,
-                              red: 0.65,
-                              green: 0.79,
-                              blue: 0.49,
-                            ),
-                      border: Border.all(color: _CuttingChip.ink, width: 2),
+          DragTarget<_Cutting>(
+            hitTestBehavior: HitTestBehavior.opaque,
+            onWillAcceptWithDetails: (_) => true,
+            onMove: (details) => _highlight(_sprigAt(details.offset)),
+            onLeave: (_) => _highlight(null),
+            // Flutter routes actual drops through the scene target. Use the
+            // preview overlap to pick the sprig, including on the final event
+            onAcceptWithDetails: (details) =>
+                _sprigAt(details.offset)?.feeding.replenish(),
+            builder: (context, candidates, rejected) => Stack(
+              children: [
+                for (final sprig in widget.sprigs)
+                  if (sprig.dropBounds case final bounds?)
+                    Positioned.fromRect(
+                      rect: bounds,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: sprig == _highlightedSprig
+                              ? const Color.from(
+                                  alpha: 0.32,
+                                  red: 0.65,
+                                  green: 0.79,
+                                  blue: 0.49,
+                                )
+                              : Colors.transparent,
+                          border: Border.all(color: _CuttingChip.ink, width: 2),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-              ),
+              ],
+            ),
+          ),
         SafeArea(
           minimum: const EdgeInsets.only(bottom: 16),
           child: Align(
@@ -61,11 +107,15 @@ class _WoodlandCuttingsTrayState extends State<WoodlandCuttingsTray> {
               maxSimultaneousDrags: 1,
               dragAnchorStrategy: pointerDragAnchorStrategy,
               onDragStarted: () => setState(() => _dragging = true),
-              onDragEnd: (_) => setState(() => _dragging = false),
-              // Lift the preview above the finger while hit testing at the finger
-              feedback: const FractionalTranslation(
-                translation: Offset(-0.5, -1),
-                child: _CuttingChip(label: 'Bramble cutting'),
+              onDragEnd: (_) => setState(() {
+                _dragging = false;
+                _highlightedSprig = null;
+              }),
+              // Keep this translation in sync with the overlap calculation
+              feedback: FractionalTranslation(
+                key: _feedbackKey,
+                translation: const Offset(-0.5, -1),
+                child: const _CuttingChip(label: 'Bramble cutting'),
               ),
               childWhenDragging: const _CuttingChip(label: 'Drop on a stem'),
               child: const _CuttingChip(label: 'Drag bramble cutting'),

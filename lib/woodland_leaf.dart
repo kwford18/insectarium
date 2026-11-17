@@ -4,24 +4,26 @@ import 'dart:ui' as ui;
 /// Draws the bramble sprig with one visible blade per remaining edible leaf
 ///
 /// Record the curves in local coordinates. A resize only changes the canvas
-/// transform, and eating or replanting rerecords this sprig alone
+/// transform. A bite, a completed meal, or replanting rerecords this sprig alone
 class WoodlandSprigArt {
   ui.Picture? _picture;
-  int? _paintedEatenLeaves;
+  ({int eatenLeaves, bool hasBite})? _paintedFoliage;
 
   void draw(
     ui.Canvas canvas,
     ui.Tangent anchor,
     double scale,
     int eatenLeaves, {
+    required bool hasBite,
     bool uphill = false,
   }) {
-    if (_picture == null || _paintedEatenLeaves != eatenLeaves) {
+    final foliage = (eatenLeaves: eatenLeaves, hasBite: hasBite);
+    if (_picture == null || _paintedFoliage != foliage) {
       final recorder = ui.PictureRecorder();
-      _paintSprig(ui.Canvas(recorder), eatenLeaves);
+      _paintSprig(ui.Canvas(recorder), eatenLeaves, hasBite);
       _picture?.dispose();
       _picture = recorder.endRecording();
-      _paintedEatenLeaves = eatenLeaves;
+      _paintedFoliage = foliage;
     }
     canvas.save();
     canvas.translate(anchor.position.dx, anchor.position.dy);
@@ -39,7 +41,7 @@ class WoodlandSprigArt {
 }
 
 // Keep the stems as the blades disappear so the player can see where food was
-void _paintSprig(ui.Canvas canvas, int eatenLeaves) {
+void _paintSprig(ui.Canvas canvas, int eatenLeaves, bool hasBite) {
   const blades = [
     (ui.Offset(10, -29), -0.18),
     (ui.Offset(5, -22), -2.55),
@@ -59,11 +61,23 @@ void _paintSprig(ui.Canvas canvas, int eatenLeaves) {
   );
   for (var index = eatenLeaves; index < blades.length; index++) {
     final (base, angle) = blades[index];
-    _paintLeaf(canvas, base, index == 0 ? 0.90 : 0.72, angle);
+    _paintLeaf(
+      canvas,
+      base,
+      index == 0 ? 0.90 : 0.72,
+      angle,
+      bitten: hasBite && index == eatenLeaves,
+    );
   }
 }
 
-void _paintLeaf(ui.Canvas canvas, ui.Offset base, double scale, double angle) {
+void _paintLeaf(
+  ui.Canvas canvas,
+  ui.Offset base,
+  double scale,
+  double angle, {
+  required bool bitten,
+}) {
   canvas.save();
   canvas.translate(base.dx, base.dy);
   canvas.rotate(angle);
@@ -72,10 +86,19 @@ void _paintLeaf(ui.Canvas canvas, ui.Offset base, double scale, double angle) {
     ..moveTo(0, 0)
     ..lineTo(5, -5)
     ..lineTo(8, -5)
-    ..lineTo(11, -8)
-    ..quadraticBezierTo(15, -7, 22, -8)
-    ..lineTo(19, -3)
-    ..lineTo(20, -1)
+    ..lineTo(11, -8);
+  if (bitten) {
+    // Curve back into the tip to leave a round notch against the background
+    blade
+      ..quadraticBezierTo(15, -7, 19, -8)
+      ..cubicTo(11, -8, 11, -1, 17, 0);
+  } else {
+    blade
+      ..quadraticBezierTo(15, -7, 22, -8)
+      ..lineTo(19, -3)
+      ..lineTo(20, -1);
+  }
+  blade
     ..lineTo(15, 2)
     ..lineTo(13, 5)
     ..quadraticBezierTo(8, 6, 0, 0)
@@ -94,7 +117,7 @@ void _paintLeaf(ui.Canvas canvas, ui.Offset base, double scale, double angle) {
   );
   canvas.drawLine(
     const ui.Offset(0, 0),
-    const ui.Offset(18, -5),
+    bitten ? const ui.Offset(12, -3) : const ui.Offset(18, -5),
     ui.Paint()
       ..color = const ui.Color.from(
         alpha: 0.8,

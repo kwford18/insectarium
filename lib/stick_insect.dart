@@ -124,6 +124,7 @@ class StickInsect extends Component with TapCallbacks {
     );
     // Hold the walking clock during a meal so the feet stay planted until the
     // selected sprig loses a leaf
+    if (meal.bitLeaf) availableSprig?.biteLeaf();
     final mealCompleted = meal.finished && (availableSprig?.eatLeaf() ?? false);
     if (!meal.feeding) _walk.advance(dt);
     final current = _walk.sample(

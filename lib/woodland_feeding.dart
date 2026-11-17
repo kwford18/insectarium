@@ -8,19 +8,28 @@ class WoodlandFeeding {
   static const leafCount = 4;
 
   int _eatenLeaves = 0;
+  bool _hasBite = false;
 
   int get eatenLeaves => _eatenLeaves;
   bool get hasLeaf => _eatenLeaves < leafCount;
+  bool get hasBite => _hasBite;
+
+  /// Marks the current leaf as visibly bitten until the meal finishes
+  void biteLeaf() {
+    _hasBite = hasLeaf;
+  }
 
   /// Removes one leaf if any remain and reports whether it was eaten
   bool eatLeaf() {
     if (!hasLeaf) return false;
     _eatenLeaves++;
+    _hasBite = false;
     return true;
   }
 
   /// Replaces the leaves on this sprig with a fresh cutting
   void replenish() {
     _eatenLeaves = 0;
+    _hasBite = false;
   }
 }

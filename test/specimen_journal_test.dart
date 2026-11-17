@@ -291,7 +291,7 @@ void main() {
     expect(journal.recentActivity.single.message, 'Ate Bramble leaf · Adult');
   });
 
-  testWidgets('a cutting replenishes only the stem it is dropped on', (
+  testWidgets('a cutting edge can replenish a stem outside the pointer', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(420, 760);
@@ -312,6 +312,7 @@ void main() {
     // Seed the fixture before the hunger clock can produce a real observation
     upper.feeding.eatLeaf();
     lower.feeding.eatLeaf();
+    lower.feeding.biteLeaf();
 
     Future<void> dropCuttingAt(Offset point) async {
       final source = tester.getCenter(find.text('Drag bramble cutting'));
@@ -330,9 +331,14 @@ void main() {
     expect(upper.feeding.eatenLeaves, 1);
     expect(lower.feeding.eatenLeaves, 1);
 
-    await dropCuttingAt(lower.dropBounds!.center);
+    final target = lower.dropBounds!;
+    // The pointer misses the target. The left edge of the raised preview overlaps it
+    final edgeDrop = target.center + const Offset(65, 20);
+    expect(target.contains(edgeDrop), isFalse);
+    await dropCuttingAt(edgeDrop);
     expect(upper.feeding.eatenLeaves, 1);
     expect(lower.feeding.eatenLeaves, 0);
+    expect(lower.feeding.hasBite, isFalse);
     expect(journal.foodEatenIn('adult'), isEmpty);
     expect(journal.recentActivity, isEmpty);
   });
