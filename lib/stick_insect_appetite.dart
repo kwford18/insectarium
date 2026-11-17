@@ -11,6 +11,9 @@ class StickInsectAppetite {
   double _untilHungry = 4;
   double _mealProgress = 0;
 
+  /// Checks whether the insect will be hungry by the time it reaches a stop
+  bool hungryWithin(double seconds) => _untilHungry <= seconds;
+
   /// Reports a held feeding pose, a visible bite, or a completed meal
   ({bool feeding, bool bitLeaf, bool finished}) advance(
     double seconds, {
@@ -21,7 +24,12 @@ class StickInsectAppetite {
       // Use only the part of this tick after hunger begins as eating time
       seconds = -_untilHungry;
     }
-    if (!leafInReach || seconds <= 0) {
+    if (!leafInReach) {
+      // A resize can remove a reachable stop while the insect is feeding
+      _mealProgress = 0;
+      return (feeding: false, bitLeaf: false, finished: false);
+    }
+    if (seconds <= 0) {
       return (feeding: false, bitLeaf: false, finished: false);
     }
 

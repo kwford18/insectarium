@@ -66,8 +66,7 @@ void main() {
       ),
       journal: journal,
       onObserve: () {},
-      upperSprig: upperSprig,
-      lowerSprig: lowerSprig,
+      feedingSprigs: [upperSprig, lowerSprig],
     )..onGameResize(Vector2(400, 760));
 
     insect.update(4);
@@ -107,5 +106,38 @@ void main() {
     expect(journal.behaviorLabel, 'Resting');
     // The original branch hit area is reachable again after the lower sprig stop
     expect(insect.containsLocalPoint(Vector2(80, 473)), isTrue);
+  });
+
+  test('the insect passes an empty lower sprig to eat from the middle', () {
+    final journal = SpecimenJournal(specimen: woodlandStickInsect);
+    addTearDown(journal.dispose);
+    final upper = WoodlandSprig();
+    final middle = WoodlandSprig(uphill: true);
+    final lower = WoodlandSprig(uphill: true);
+    for (var leaf = 0; leaf < 4; leaf++) {
+      lower.feeding.eatLeaf();
+    }
+    final insect = StickInsect(
+      trailPath: (_) => (
+        path: ui.Path()
+          ..moveTo(20, 500)
+          ..lineTo(380, 500),
+        groundStart: 140,
+      ),
+      journal: journal,
+      onObserve: () {},
+      feedingSprigs: [upper, middle, lower],
+    )..onGameResize(Vector2(400, 760));
+
+    // Advance through a real sequence of departure and arrival ticks so the
+    // route must account for hunger that develops during the uphill climb
+    for (var frame = 0; frame < 240; frame++) {
+      insect.update(0.1);
+    }
+
+    expect(upper.feeding.eatenLeaves, 1);
+    expect(middle.feeding.eatenLeaves, 1);
+    expect(lower.feeding.hasLeaf, isFalse);
+    expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 2);
   });
 }

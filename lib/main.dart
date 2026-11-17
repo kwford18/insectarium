@@ -102,15 +102,18 @@ class _TerrariumGame extends FlameGame {
         trailPath: woodlandTrail,
         journal: journal,
         onObserve: () => overlays.add(_journalOverlay),
-        upperSprig: sprigs.first,
-        lowerSprig: sprigs.last,
+        feedingSprigs: sprigs,
       ),
       WoodlandEnclosure(foreground: true),
     ]);
   }
 
   final SpecimenJournal journal;
-  final sprigs = [WoodlandSprig(), WoodlandSprig(uphill: true)];
+  final sprigs = [
+    WoodlandSprig(),
+    WoodlandSprig(uphill: true),
+    WoodlandSprig(uphill: true),
+  ];
 
   @override
   void lifecycleStateChange(AppLifecycleState state) {

@@ -29,7 +29,6 @@ class WoodlandEnclosure extends Component {
     if (foreground) {
       // The live feeding sprig replaces the decoration near the branch rest
       _paintSprigs(canvas, layout.upperBranch, scale, [0.70], 17);
-      _paintSprigs(canvas, layout.stem, scale, [0.32], 63);
     } else {
       _paintWash(canvas, size, scale);
       _paintUnderstory(canvas, size, scale);

@@ -2,7 +2,7 @@
 
 The woodland stick insect rests on the upper branch, follows the existing trail to the floor, rests again, and returns uphill. The timed route makes both surfaces observable and preserves planted feet at each stop. The route clock lives in `StickInsectWalk`. The Flame component maps that clock onto the enclosure geometry, renders the gait, and reports observations through the existing journal API.
 
-The prototype starts with four edible leaves on each of two sprigs. One is at the upper branch rest point. The other is a brief stop on the climb back from the floor. Hunger advances as the insect explores. A hungry insect can feed at either stop if leaves remain there. A notch appears in the leaf partway through the meal. On completion, the leaf disappears and the journal receives one `FoodEaten` observation. The sprigs start fresh on reload. The journal persists completed feedings independently.
+The prototype starts with four edible leaves on each of three sprigs. One is at the upper branch rest point, and two lie along the climb back from the floor. Hunger advances as the insect explores. At departure from the floor it chooses the first reachable sprig with leaves where it expects to be hungry on arrival. It keeps that choice for the climb so the gait stays continuous. It can also feed when it gets hungry at the upper branch rest point. A notch appears in the leaf partway through the meal. On completion, the leaf disappears and the journal receives one `FoodEaten` observation. The sprigs start fresh on reload. The journal persists completed feedings independently.
 
 Drag a bramble cutting from the bottom tray to a marked stem to replace that sprig's leaves. Any overlap between the cutting preview and the stem marker counts. If two markers overlap the preview, the closest stem receives the cutting. The tray provides as many cuttings as needed for this prototype. A missed drop leaves the sprigs alone. Replanting only changes the sprig's food state, so the journal still records completed meals.
 
@@ -16,7 +16,7 @@ Plant care should happen through the enclosure itself. The cutting prototype giv
 
 ## Follow-up behavior work
 
-- Choose among reachable branch and floor destinations, and let the insect decide when to rest, explore, or approach food
+- Give the insect a choice of branch and floor routes, and let it decide when to rest, explore, or approach food
 - Extend feeding to more of the shrub, then test how players decide when and where to replant
 - Add a turn animation and tune travel and rest timing in the enclosure
 - Develop another species with its own feeding or movement rules before extracting behavior shared by both
