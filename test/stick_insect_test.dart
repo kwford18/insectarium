@@ -50,11 +50,10 @@ void main() {
     }
   });
 
-  test('the insect rests on the branch, visits the floor, and climbs back', () {
+  test('a hungry insect waits to eat until it returns to the sprig', () {
     final journal = SpecimenJournal(specimen: woodlandStickInsect);
     addTearDown(journal.dispose);
     final feeding = WoodlandFeeding();
-    addTearDown(feeding.dispose);
     final insect = StickInsect(
       trailPath: (_) => (
         path: ui.Path()
@@ -70,28 +69,31 @@ void main() {
     insect.update(4);
     expect(journal.behaviorLabel, 'Resting');
     expect(journal.recentActivity, isEmpty);
+    insect.update(1);
+    expect(journal.behaviorLabel, 'Feeding');
+    insect.update(0.6);
+    expect(feeding.eatenLeaves, 1);
+
     insect.update(2);
     expect(journal.behaviorLabel, 'Climbing');
     insect.update(6);
     expect(journal.behaviorLabel, 'Resting');
-    expect(journal.recentActivity.single.message, 'Reached the leaf litter');
+    expect(journal.recentActivity.first.message, 'Reached the leaf litter');
 
-    // A serving offered on the floor visit waits at the branch station
-    feeding.offerLeaf();
+    // The second hunger interval runs out during the trip, away from food
     insect.update(7);
     expect(journal.behaviorLabel, 'Climbing');
-    expect(feeding.hasLeaf, isTrue);
-    expect(journal.foodEatenIn('adult'), isEmpty);
+    expect(feeding.eatenLeaves, 1);
     insect.update(1);
     expect(journal.behaviorLabel, 'Resting');
     // The original branch hit area is reachable again after the return walk
     expect(insect.containsLocalPoint(Vector2(80, 473)), isTrue);
-    expect(journal.recentActivity, hasLength(1));
+    expect(journal.recentActivity, hasLength(2));
 
     insect.update(1);
     expect(journal.behaviorLabel, 'Feeding');
     insect.update(1);
-    expect(feeding.hasLeaf, isFalse);
-    expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 1);
+    expect(feeding.eatenLeaves, 2);
+    expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 2);
   });
 }

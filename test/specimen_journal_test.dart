@@ -234,7 +234,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(journal.behaviorLabel, 'Resting');
-      expect(journal.recentActivity.single.message, 'Reached the leaf litter');
+      expect(journal.recentActivity.first.message, 'Reached the leaf litter');
 
       // Tap the resting insect's hit area for the fixed 420 × 760 viewport
       await tester.tapAt(const Offset(354, 595));
@@ -266,16 +266,19 @@ void main() {
     },
   );
 
-  testWidgets('offering a leaf records one completed meal', (tester) async {
+  testWidgets('a hungry insect feeds from the shrub without input', (
+    tester,
+  ) async {
     final journal = SpecimenJournal(specimen: woodlandStickInsect);
     addTearDown(journal.dispose);
     await tester.pumpWidget(SanctuaryApp(journal: journal));
     await tester.pump(const Duration(milliseconds: 16));
 
-    await tester.tap(find.text('Offer leaf'));
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(find.text('Leaf offered'), findsOneWidget);
+    for (var frame = 0; frame < 45; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(journal.behaviorLabel, 'Feeding');
+    expect(find.text('Specimen journal'), findsNothing);
     expect(journal.foodEatenIn('adult'), isEmpty);
 
     // Let the insect finish while the journal is closed, then give the
@@ -283,7 +286,6 @@ void main() {
     for (var frame = 0; frame < 25; frame++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(find.text('Offer leaf'), findsOneWidget);
     expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 1);
     expect(journal.recentActivity.single.message, 'Ate Bramble leaf · Adult');
   });

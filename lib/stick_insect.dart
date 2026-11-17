@@ -6,6 +6,7 @@ import 'package:flame/events.dart';
 
 import 'specimen_journal.dart';
 import 'specimen_observation.dart';
+import 'stick_insect_appetite.dart';
 import 'stick_insect_art.dart';
 import 'stick_insect_walk.dart';
 import 'woodland_feeding.dart';
@@ -50,6 +51,9 @@ class StickInsect extends Component with TapCallbacks {
   double _elapsed = 0.0;
   String? _reportedBehavior;
   final _walk = StickInsectWalk();
+  final _appetite = StickInsectAppetite();
+  final _sprigArt = WoodlandSprigArt();
+  ui.Tangent? _sprigAnchor;
 
   @override
   void onGameResize(Vector2 size) {
@@ -73,6 +77,10 @@ class StickInsect extends Component with TapCallbacks {
     _routeStrides = ((trail.length - 2 * margin) / stride).floor();
     // Center the walk to leave room for foot placement at both ends
     _start = (trail.length - _routeStrides * stride) / 2;
+    // Put the sprig just ahead of the branch rest where the mouth can reach it
+    _sprigAnchor = feeding == null
+        ? null
+        : _tangentAt(trail, _start + 18 * _scale);
   }
 
   @override
@@ -83,17 +91,20 @@ class StickInsect extends Component with TapCallbacks {
     final previous = _walk.sample(_routeStrides);
     _elapsed += dt;
     final feeding = this.feeding;
-    final eating = previous.atBranchRest && feeding != null && feeding.hasLeaf;
-    // Hold the planted branch pose during a meal. The walk schedule resumes on
-    // the next tick after the leaf disappears
-    final mealCompleted = eating && feeding.advanceMeal(dt);
-    if (!eating) _walk.advance(dt);
+    final meal = _appetite.advance(
+      dt,
+      leafInReach: previous.atBranchRest && (feeding?.hasLeaf ?? false),
+    );
+    // Let the existing walk bring a hungry insect back to the sprig. Once a
+    // meal starts, hold the planted branch pose until it finishes
+    final mealCompleted = meal.finished && (feeding?.eatLeaf() ?? false);
+    if (!meal.feeding) _walk.advance(dt);
     final current = _walk.sample(_routeStrides);
     final wasOnGround =
         _routeDistance(previous.strides, previous.returning) >= _groundStart;
     final onGround =
         _routeDistance(current.strides, current.returning) >= _groundStart;
-    final behavior = eating && !mealCompleted
+    final behavior = meal.feeding && !mealCompleted
         ? 'feeding'
         : current.moving
         ? (onGround ? 'walking' : 'climbing')
@@ -191,14 +202,10 @@ class StickInsect extends Component with TapCallbacks {
 
     final walk = _walk.sample(_routeStrides);
     final (body, forward) = _pose(trail, walk.strides, walk.returning);
-    if (feeding?.hasLeaf ?? false) {
-      final (branchBody, branchForward) = _pose(trail, 0, false);
-      paintWoodlandLeaf(
-        canvas,
-        branchBody + branchForward * (34 * _scale),
-        _scale,
-        math.atan2(branchForward.dy, branchForward.dx),
-      );
+    final anchor = _sprigAnchor;
+    final feeding = this.feeding;
+    if (anchor != null && feeding != null) {
+      _sprigArt.draw(canvas, anchor, _scale, feeding.eatenLeaves);
     }
     StickInsectArt.draw(
       canvas,
@@ -212,6 +219,12 @@ class StickInsect extends Component with TapCallbacks {
       routeDistance: _routeDistance,
       elapsed: _elapsed,
     );
+  }
+
+  @override
+  void onRemove() {
+    _sprigArt.dispose();
+    super.onRemove();
   }
 
   // Gait distances start at the departure point of each leg. Path metrics
