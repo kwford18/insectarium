@@ -11,6 +11,8 @@ class JournalEntry {
   const JournalEntry(this.message, this.recordedAt);
 
   final String message;
+
+  /// Time of the simulation event, converted to local time by the view
   final DateTime recordedAt;
 }
 
@@ -20,8 +22,14 @@ typedef FoodRecord = ({String name, int count});
 /// Keeps the live status and accumulated observations for one specimen
 ///
 /// Discoveries and feeding records have their own storage in the journal so
-/// they remain available after their activity entries roll off the list
+/// they remain available after their activity entries roll off the list.
+/// The simulation calls [observe] whether or not the overlay is mounted. The
+/// overlay reads the resulting state through this notifier
 class SpecimenJournal extends ChangeNotifier {
+  /// Starts at the species' initial stage and restores compatible saved data
+  ///
+  /// The persistence callback receives the encoded snapshot. Without a writer,
+  /// the journal collects observations for the current session
   SpecimenJournal({required this.specimen, String? snapshot, this._persist})
     : _stageId = specimen.species.initialStageId {
     _stagesSeen.add(_stageId);
@@ -39,6 +47,7 @@ class SpecimenJournal extends ChangeNotifier {
 
   String _stageId;
   String? _behaviorId;
+  // Track state that needs a snapshot separately from writes already in flight
   bool _dirty = false;
   bool _saveFailed = false;
   bool _disposed = false;
@@ -46,19 +55,30 @@ class SpecimenJournal extends ChangeNotifier {
 
   SpeciesDefinition get species => specimen.species;
   String get stageId => _stageId;
+
+  /// Distinct stages in first-seen order for the lifecycle summary
   List<String> get stagesSeen => List.unmodifiable(_stagesSeen);
+
+  /// The current display label, available after the simulation reports behavior
   String? get behaviorLabel => species.behaviors[_behaviorId];
+
+  /// Indicates whether a writer is present with no outstanding write failure
   bool get canSave => _persist != null && !_saveFailed;
+
+  /// A bounded snapshot in reverse observation order
   List<JournalEntry> get recentActivity => List.unmodifiable(_entries);
   List<String> get facts => List.unmodifiable(_facts.values);
   List<String> get morphs => List.unmodifiable(_morphs.values);
 
+  /// Feeding counts by food ID within a stage, empty until feeding is observed
   Map<String, FoodRecord> foodEatenIn(String stageId) =>
       Map.unmodifiable(_foodByStage[stageId] ?? const {});
 
   /// Applies an observation for this individual and its current stage
   ///
-  /// Returns whether it changed the journal. Durable changes schedule a save
+  /// Returns false for events addressed to the wrong specimen or stage, and
+  /// for events that leave the record unchanged. Durable changes schedule
+  /// a save while listeners get the new state immediately
   bool observe(SpecimenObservation observation) {
     if (observation.specimenId != specimen.id ||
         observation.stageId != _stageId) {
@@ -97,6 +117,7 @@ class SpecimenJournal extends ChangeNotifier {
   }
 
   bool _recordDiscovery(DiscoveryObserved event) {
+    // Stable IDs allow a discovery's description to be refined in place
     if (_facts[event.id] == event.description) return false;
     _facts[event.id] = event.description;
     final message = event.activityMessage;
@@ -127,6 +148,7 @@ class SpecimenJournal extends ChangeNotifier {
     }
     _stageId = event.nextStageId;
     _stagesSeen.add(_stageId);
+    // Wait for the new stage to report behavior so its profile starts fresh
     _behaviorId = null;
     _addEntry(
       'Entered the ${next.label.toLowerCase()} stage',
@@ -143,15 +165,20 @@ class SpecimenJournal extends ChangeNotifier {
   }
 
   void _addEntry(String message, DateTime at) {
+    // Store observation times in UTC and let the view handle local formatting
     _entries.insert(0, JournalEntry(message, at.toUtc()));
     if (_entries.length > entryLimit) _entries.removeLast();
   }
 
-  /// Waits for queued writes and schedules a snapshot if the journal is dirty
+  /// Queues a snapshot when needed and returns the tail of the write queue
+  ///
+  /// Write failures stay in the journal's state so the game can retry on a
+  /// later durable observation or lifecycle flush
   Future<void> save() {
     final persist = _persist;
     if (persist == null || !_dirty) return _pendingSave;
 
+    // Encode the current maps now so later observations can't change this write
     final snapshot = jsonEncode({
       'version': 2,
       'specimenId': specimen.id,
@@ -187,12 +214,14 @@ class SpecimenJournal extends ChangeNotifier {
         _dirty = true;
         _saveFailed = true;
       }
+      // Only a change to save availability affects the UI after a write
       if (!_disposed && previouslyFailed != _saveFailed) notifyListeners();
     });
     return _pendingSave;
   }
 
   void _restore(String snapshot) {
+    // Validate identity and version before merging any fields into live state
     final state = _decodeSnapshot(snapshot);
     if (state == null ||
         state['version'] != 2 ||
@@ -201,6 +230,7 @@ class SpecimenJournal extends ChangeNotifier {
       return;
     }
 
+    // Keep the default stage if the save refers to a stage that no longer exists
     final stage = state['stageId'];
     if (stage is String && species.stages.containsKey(stage)) _stageId = stage;
     final seen = state['stagesSeen'];
@@ -253,6 +283,7 @@ class SpecimenJournal extends ChangeNotifier {
     }
   }
 
+  // Decode fields separately so a malformed entry leaves its valid peers intact
   static void _restoreFields<T>(
     Object? source,
     Map<String, T> target,
@@ -267,6 +298,7 @@ class SpecimenJournal extends ChangeNotifier {
 
   @override
   void dispose() {
+    // A pending write can finish after disposal, when listeners are gone
     _disposed = true;
     super.dispose();
   }
@@ -282,6 +314,9 @@ Map<String, dynamic>? _decodeSnapshot(String snapshot) {
 }
 
 /// Carries the original woodland discoveries and activity into a specimen save
+///
+/// The original record had no specimen identity or lifecycle stage, so the
+/// migration assigns both from the woodland prototype's definition
 String? migrateWoodlandJournal(String? snapshot) {
   if (snapshot == null) return null;
   final old = _decodeSnapshot(snapshot);

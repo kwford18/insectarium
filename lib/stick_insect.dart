@@ -18,16 +18,28 @@ class StickInsect extends Component with TapCallbacks {
     required this.onObserve,
   });
 
+  /// Builds a continuous contour in scene coordinates for the current viewport
+  ///
+  /// The ground offset is measured along the curve from its first point and
+  /// gives both the behavior logic and the gait the same surface boundary
   final ({ui.Path path, double groundStart}) Function(Vector2 size) trailPath;
+
+  /// Receives behavior transitions and discoveries even while its view is closed
   final SpecimenJournal journal;
+
+  /// Lets the game decide how to present the journal when the insect is tapped
   final void Function() onObserve;
 
+  // Lengths and speed are authored for a 400-unit short side. Resize scales
+  // both by the same factor to keep stride size and pace proportional
   static const _stride = 30.0;
+  // A stance longer than half a cycle gives the two tripods overlapping contact
   static const _stanceFraction = 0.64;
   static const _startDelay = 0.8;
   static const _walkSpeed = 50.0;
   static const _ink = ui.Color(0xFF513523);
   static const _pigment = ui.Color(0xFFB98751);
+  // The tap area includes the thin legs and antennae so the body is easy to select
   static const _tapBounds = ui.Rect.fromLTRB(-46, -20, 56, 36);
 
   ui.PathMetric? _trail;
@@ -55,7 +67,8 @@ class StickInsect extends Component with TapCallbacks {
     _scale = math.min(size.x, size.y) / 400;
     final stride = _stride * _scale;
     final margin = math.min(55 * _scale, trail.length / 4);
-    // Whole strides let all six feet settle at the end
+    // A whole final stride leaves the two tripods at phases 0 and 0.5, both
+    // inside the stance interval. A partial stride can freeze a foot mid-swing
     _walkDistance = ((trail.length - 2 * margin) / stride).floor() * stride;
     // Center the walk to leave room for foot placement at both ends
     _start = (trail.length - _walkDistance) / 2;
@@ -69,6 +82,8 @@ class StickInsect extends Component with TapCallbacks {
     final previousTravel = _travel;
     _elapsed += dt;
     final travel = _travel;
+    // Detect crossings between samples so a long frame can still see the insect
+    // reach the floor and finish the walk in a single update
     final wasOnGround = _start + previousTravel >= _groundStart;
     final onGround = _start + travel >= _groundStart;
     final moving = travel > 0 && travel < _walkDistance;
@@ -109,6 +124,7 @@ class StickInsect extends Component with TapCallbacks {
       );
     }
     if (restedOnGround) {
+      // Keep this as a learned fact. The earlier floor arrival already has a log entry
       journal.observe(
         DiscoveryObserved(
           specimenId: specimenId,
@@ -127,7 +143,8 @@ class StickInsect extends Component with TapCallbacks {
     if (trail == null) return false;
 
     final (body, forward, _) = _pose(trail);
-    // Test the tap in the insect's own coordinate system as it turns and scales
+    // Undo the body's translation and scale, then project onto its forward and
+    // down axes. The same local tap bounds work at every angle along the trail
     final relative = (ui.Offset(point.x, point.y) - body) / _scale;
     final along = relative.dx * forward.dx + relative.dy * forward.dy;
     final down = relative.dy * forward.dx - relative.dx * forward.dy;
@@ -146,6 +163,8 @@ class StickInsect extends Component with TapCallbacks {
     if (trail == null) return;
 
     final (body, forward, strideCount) = _pose(trail);
+    // Draw feet in scene coordinates because their anchors are sampled from the
+    // route. Draw the body over the hips using a local, right-facing silhouette
     final legPaint = ui.Paint()
       ..style = ui.PaintingStyle.stroke
       ..strokeCap = ui.StrokeCap.round
@@ -175,7 +194,8 @@ class StickInsect extends Component with TapCallbacks {
     canvas.restore();
   }
 
-  // The scripted walk eases in and out once, then stays at its endpoint
+  // This prototype has one timed traversal. Clamping keeps travel at zero
+  // during the starting delay and at full distance after the walk finishes
   double get _travel {
     final duration = _walkDistance / (_walkSpeed * _scale);
     if (duration == 0) return 0;
@@ -185,6 +205,8 @@ class StickInsect extends Component with TapCallbacks {
 
   (ui.Offset, ui.Offset, double) _pose(ui.PathMetric trail) {
     final travel = _travel;
+    // Distance drives the gait so the legs slow down with the eased body motion.
+    // Two bobs per stride follow the two alternating sets of feet
     final strideCount = travel / (_stride * _scale);
     final tangent = _tangentAt(trail, _start + travel);
     final forward = tangent.vector;
@@ -213,7 +235,9 @@ class StickInsect extends Component with TapCallbacks {
       1.0,
     );
 
-    // Fix the foot on the path during stance, then ease it to the next anchor
+    // The integer cycle chooses a fixed path anchor through stance. During
+    // swing the foot advances one stride and lifts in an arc that returns to
+    // zero at both ends, where it joins the adjacent stance positions
     final anchor = (wholeSteps - phaseOffset + _stanceFraction / 2) * _stride;
     final reach = (leg - 1) * 22 + (side == 0 ? -4 : 3);
     final footDistance =
@@ -231,6 +255,7 @@ class StickInsect extends Component with TapCallbacks {
         footTangent.position +
         _up(footTangent.vector) * ((gripHeight + lift) * _scale);
     final hip = body + forward * ((leg * 12 - 11) * _scale);
+    // Offset each knee along the body to give the three pairs distinct profiles
     final knee =
         ui.Offset.lerp(hip, foot, 0.44)! +
         forward * (((leg - 1) * 8 + (side == 0 ? 5 : -4)) * _scale);
@@ -242,6 +267,8 @@ class StickInsect extends Component with TapCallbacks {
     canvas.drawPath(legPath, paint);
   }
 
+  // The tail sits on the negative x side and the head on the positive x side.
+  // A shared vertical wash carries the same highlight and shadow into the head
   void _drawBody(ui.Canvas canvas) {
     final body = ui.Path()
       ..moveTo(-39, 0)
@@ -291,6 +318,7 @@ class StickInsect extends Component with TapCallbacks {
     }
 
     line.color = const ui.Color(0xFF735033);
+    // Use elapsed time here so the antennae keep moving during rests
     final feel = math.sin(_elapsed * 2.5) * 3;
     final antennae = ui.Path()
       ..moveTo(28.5, -2.5)
@@ -303,10 +331,13 @@ class StickInsect extends Component with TapCallbacks {
   }
 
   static ui.Tangent _tangentAt(ui.PathMetric trail, double distance) {
+    // Feet can reach beyond the body's travel range near either end of the route
     return trail.getTangentForOffset(distance.clamp(0.0, trail.length))!;
   }
 
+  // In a y-down canvas, a right-facing tangent gives an upward normal
   static ui.Offset _up(ui.Offset forward) => ui.Offset(forward.dy, -forward.dx);
 
+  // Smoothstep gives zero slope at both ends of travel and each foot swing
   static double _ease(double t) => t * t * (3 - 2 * t);
 }

@@ -11,9 +11,14 @@ import 'stick_insect.dart';
 import 'woodland_enclosure.dart';
 
 const _journalOverlay = 'specimenJournal';
+// Keep the original key readable for saves from the single-specimen prototype
 const _legacyJournalKey = 'woodland.stickInsect.journal.v1';
 
 /// Loads the saved specimen history before mounting the game
+///
+/// This gives the simulation and the overlay the same restored journal from
+/// the first frame. The journal receives its storage callback here so tests can
+/// use the same code with an in-memory store
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final preferences = SharedPreferencesAsync();
@@ -28,6 +33,8 @@ Future<void> main() async {
         await preferences.getString(_legacyJournalKey),
       );
       if (snapshot != null) {
+        // Attempt to save the migrated copy once. A failed write still leaves
+        // the migrated history available in memory for this launch
         try {
           await preferences.setString(journalKey, snapshot);
         } catch (error) {
@@ -50,10 +57,14 @@ Future<void> main() async {
 }
 
 /// Hosts the Flame scene and its Flutter journal overlay
+///
+/// The overlay and the specimen share one journal instance. Closing the view
+/// removes it from the overlay manager and keeps the journal in the game
 class SanctuaryApp extends StatelessWidget {
   SanctuaryApp({super.key, required SpecimenJournal journal})
     : _game = _TerrariumGame(journal);
 
+  // Hold the game outside build so a rebuild of this widget doesn't reset the walk
   final _TerrariumGame _game;
 
   @override
@@ -74,6 +85,7 @@ class SanctuaryApp extends StatelessWidget {
   }
 }
 
+// Wires the scene together and translates specimen taps into overlay requests
 class _TerrariumGame extends FlameGame {
   _TerrariumGame(this.journal) {
     // Split enclosure art across layers so foliage can partly hide the insect

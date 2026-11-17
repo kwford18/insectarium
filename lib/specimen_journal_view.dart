@@ -10,6 +10,7 @@ class SpecimenJournalView extends StatelessWidget {
     required this.onClose,
   });
 
+  /// The same journal the game updates, including while this overlay is closed
   final SpecimenJournal journal;
   final VoidCallback onClose;
 
@@ -48,9 +49,11 @@ class SpecimenJournalView extends StatelessWidget {
                       ),
                     ],
                   ),
+                  // Scroll the growing journal body and keep the close control visible
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.only(right: 6),
+                      // Rebuild the changing content without rebuilding the panel
                       child: ListenableBuilder(
                         listenable: journal,
                         builder: (context, _) => _contents(),
@@ -90,6 +93,7 @@ class SpecimenJournalView extends StatelessWidget {
           Text(stage),
           if (behavior != null) Text(behavior),
           for (final morph in journal.morphs) Text('Morph · $morph'),
+          // Start the history summary once there is a transition to show
           if (stagesSeen.length > 1)
             Text(stagesSeen.map((id) => species.stages[id]!.label).join(' → ')),
           const SizedBox(height: 16),
@@ -103,6 +107,7 @@ class SpecimenJournalView extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(fact),
               ),
+          // Keep larval and adult feedings distinct even for the same food
           for (final stageId in stagesSeen)
             for (final food in journal.foodEatenIn(stageId).values)
               Text(
@@ -110,6 +115,7 @@ class SpecimenJournalView extends StatelessWidget {
               ),
           const Divider(height: 24),
           ExpansionTile(
+            // Keep expansion through journal updates. A fresh overlay starts closed
             key: ValueKey(journal.specimen.id),
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.only(bottom: 2),
@@ -134,7 +140,8 @@ class SpecimenJournalView extends StatelessWidget {
       Text(label, style: const TextStyle(fontWeight: FontWeight.w600));
 }
 
-// The tile mounts this widget on expansion, so opening the journal skips timestamp formatting
+// With the tile's default maintainState setting, the rows have their own build
+// only while expanded or animating. The collapsed tile can show a count cheaply
 class _ActivityEntries extends StatelessWidget {
   const _ActivityEntries({required this.entries});
 
@@ -146,6 +153,7 @@ class _ActivityEntries extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: entries.map((entry) {
+        // The snapshot stores a UTC time and the view uses the player's locale
         final recordedAt = entry.recordedAt.toLocal();
         final date = localizations.formatShortDate(recordedAt);
         final time = localizations.formatTimeOfDay(

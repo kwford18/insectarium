@@ -10,11 +10,17 @@ sealed class SpecimenObservation {
   });
 
   final String specimenId;
+
+  /// Stage at the time of the event, including the source of a transition
   final String stageId;
+
+  /// Clock time used for recent activity when the event is logged
   final DateTime recordedAt;
 }
 
 /// Updates the live behavior shown in the journal without adding history
+///
+/// The producer reports transitions using IDs from the species definition
 class BehaviorChanged extends SpecimenObservation {
   const BehaviorChanged({
     required super.specimenId,
@@ -39,10 +45,15 @@ class DiscoveryObserved extends SpecimenObservation {
 
   final String id;
   final String description;
+
+  /// Supply a message for milestones that belong in the recent activity list
   final String? activityMessage;
 }
 
 /// Reports a completed feeding so the journal can count it for this stage
+///
+/// A food ID joins repeated feedings into one record within the stage.
+/// The count records what was eaten and can provide evidence for later mechanics
 class FoodEaten extends SpecimenObservation {
   const FoodEaten({
     required super.specimenId,

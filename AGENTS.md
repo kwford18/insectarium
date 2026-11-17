@@ -4,7 +4,8 @@
 
 - Keep files focused on one responsibility. Split simulation rules, rendering, input, and persistence at clear boundaries when their logic grows
 - Document why code exists, how non-obvious logic works, and what constraints it preserves. Add Dart doc comments for public types and APIs whose purpose or contract needs explanation, and keep them current when the code changes
-- Keep comments selective. For every code comment and doc comment, omit a period, question mark, or exclamation mark at the end of the comment. Use normal punctuation within the comment
+- Write for a maintainer returning after several months. Cover the flow across components and explain assumptions such as coordinate systems, state transitions, persistence boundaries, and test fixtures where they matter
+- For every code comment and doc comment, omit a period, question mark, or exclamation mark at the end of the comment. Use normal punctuation within the comment
 - Prefer descriptive headings and unnumbered lists in comments and documentation. Use numbering only when it makes a required order materially clearer
 - Prefer `ColorScheme.fromSeed` for Flutter interface themes and `Color.from` for explicit color channels when appropriate
 - Run the full Flutter test suite from the app root after making code changes

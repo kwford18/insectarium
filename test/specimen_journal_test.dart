@@ -24,6 +24,8 @@ const _caterpillar = Specimen(
 
 void main() {
   test('behavior changes update the journal without adding activity', () async {
+    // Count notifications and writes separately. The overlay should refresh on
+    // transitions while repeated reports leave both the UI and storage alone
     const specimen = woodlandStickInsect;
     var saves = 0;
     final journal = SpecimenJournal(
@@ -74,6 +76,8 @@ void main() {
     );
     expect(journal.recentActivity.single.message, 'Reached the leaf litter');
 
+    // Push the original entry beyond the cap. Equal timestamps also show that
+    // the log keeps observation order when events share a timestamp
     for (var i = 0; i <= SpecimenJournal.entryLimit; i++) {
       journal.observe(
         DiscoveryObserved(
@@ -86,6 +90,7 @@ void main() {
         ),
       );
     }
+    // Wait for queued writes before using the last snapshot as a cold start
     await journal.save();
 
     final restored = SpecimenJournal(specimen: specimen, snapshot: snapshot);
@@ -100,6 +105,7 @@ void main() {
   });
 
   test('the woodland migration preserves discoveries and timestamps', () {
+    // Include the old timer fields to exercise a save from before their removal
     final snapshot = migrateWoodlandJournal('''
 {
   "branchSeconds": 42.5,
@@ -152,6 +158,7 @@ void main() {
       nextStageId: to,
     );
 
+    // Guard both the species' transition rules and the journal's specimen filter
     expect(journal.observe(stageChange('larva', 'adult')), isFalse);
     expect(
       journal.observe(food('larva', 'leaf', 'Leaf', specimenId: 'other')),
@@ -160,6 +167,7 @@ void main() {
     expect(journal.observe(food('larva', 'leaf', 'Leaf')), isTrue);
     expect(journal.observe(food('larva', 'leaf', 'Leaf')), isTrue);
     expect(journal.observe(stageChange('larva', 'pupa')), isTrue);
+    // A delayed larval observation must never count toward the pupa's diet
     expect(journal.observe(food('larva', 'leaf', 'Leaf')), isFalse);
     expect(journal.observe(stageChange('pupa', 'adult')), isTrue);
     expect(journal.observe(food('adult', 'nectar', 'Nectar')), isTrue);
@@ -222,6 +230,7 @@ void main() {
       expect(journal.behaviorLabel, 'Resting');
       expect(journal.recentActivity.single.message, 'Reached the leaf litter');
 
+      // Tap the resting insect's hit area for the fixed 420 × 760 viewport
       await tester.tapAt(const Offset(354, 595));
       await tester.pump(const Duration(milliseconds: 60));
       expect(find.text('Specimen journal'), findsOneWidget);
@@ -235,6 +244,7 @@ void main() {
 
       await tester.tap(find.text('Recent activity'));
       await tester.pump();
+      // Give the tile time to expand before checking its rendered entry
       await tester.pump(const Duration(milliseconds: 220));
       expect(find.text('Reached the leaf litter'), findsOneWidget);
 
@@ -242,6 +252,7 @@ void main() {
       await tester.pump();
       expect(find.text('Specimen journal'), findsNothing);
 
+      // A fresh overlay starts collapsed while the recorded activity survives
       await tester.tapAt(const Offset(354, 595));
       await tester.pump(const Duration(milliseconds: 60));
       expect(find.text('Recent activity'), findsOneWidget);

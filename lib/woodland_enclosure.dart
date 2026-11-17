@@ -4,10 +4,14 @@ import 'dart:ui' as ui;
 import 'package:flame/components.dart';
 
 /// Paints the static woodland scene in layers around the specimen
+///
+/// Each layer records its own picture on resize. Together they let selected
+/// sprigs cross in front of the insect while the branches stay behind it
 class WoodlandEnclosure extends Component {
   WoodlandEnclosure({this.foreground = false})
     : super(priority: foreground ? 1 : -1);
 
+  /// Selects the foliage layer drawn above the insect's default priority of zero
   final bool foreground;
   ui.Picture? _picture;
 
@@ -60,10 +64,12 @@ class WoodlandEnclosure extends Component {
       ], 43);
     }
 
+    // Replace the old picture after recording the new viewport's drawing
     _picture?.dispose();
     _picture = recorder.endRecording();
   }
 
+  // Extend the visual base of the stem into the soil at the shared route join
   void _paintRoots(ui.Canvas canvas, ui.Offset root, double scale) {
     final x = root.dx;
     final y = root.dy;
@@ -101,6 +107,7 @@ class WoodlandEnclosure extends Component {
       final pigment = i.isEven
           ? const ui.Color.fromARGB(69, 3, 153, 83)
           : const ui.Color(0x4DBC9848);
+      // Fade each patch into transparent pigment so overlapping washes stay soft
       paint.shader = ui.Gradient.radial(center, radius, [
         pigment,
         pigment.withValues(alpha: 0),
@@ -109,6 +116,7 @@ class WoodlandEnclosure extends Component {
     }
   }
 
+  // Suggest distant foliage with faint silhouettes and tapered rows of leaves
   void _paintUnderstory(ui.Canvas canvas, Vector2 size, double scale) {
     final stems = [
       (
@@ -151,6 +159,8 @@ class WoodlandEnclosure extends Component {
     Vector2 size,
     double scale,
   ) {
+    // Close a copy down to the viewport edges so the floor fill follows the
+    // same upper edge the feet use while keeping the original curve open
     final soil = ui.Path.from(layout.groundSurface)
       ..lineTo(size.x, size.y)
       ..lineTo(0, size.y)
@@ -165,6 +175,7 @@ class WoodlandEnclosure extends Component {
         ),
     );
 
+    // Leaf litter is painted here. The route only uses the soil edge itself
     final random = math.Random(91);
     final leafPaint = ui.Paint();
     for (var i = 0; i < 35; i++) {
@@ -199,7 +210,8 @@ class WoodlandEnclosure extends Component {
     final left = <ui.Offset>[];
     final right = <ui.Offset>[];
     final grain = ui.Path();
-    // Offset the sampled centerline on both sides to taper the branch silhouette
+    // Widths are fractions of the viewport's short side. Sample at equal
+    // distances along the curve and vary one edge for a less uniform silhouette
     for (var i = 0; i <= 30; i++) {
       final t = i / 30;
       final tangent = curve.getTangentForOffset(t * curve.length)!;
@@ -216,6 +228,7 @@ class WoodlandEnclosure extends Component {
         grain.lineTo(highlight.dx, highlight.dy);
       }
     }
+    // Walk one edge out and the other back to close the silhouette in order
     final bark = ui.Path()..addPolygon([...left, ...right.reversed], true);
     canvas.drawPath(bark, ui.Paint()..color = const ui.Color(0xFF816044));
     canvas.drawPath(
@@ -228,6 +241,8 @@ class WoodlandEnclosure extends Component {
     );
   }
 
+  // Each site is a fraction of the branch's arc length. Tangents orient the
+  // sprigs along the wood and normals let them alternate across the branch
   void _paintSprigs(
     ui.Canvas canvas,
     ui.Path branch,
@@ -261,6 +276,7 @@ class WoodlandEnclosure extends Component {
         final length = scale * (0.042 + random.nextDouble() * 0.038);
         final end = base + (direction * 0.66 + normal * turn * 0.74) * length;
         final mid = ui.Offset.lerp(base, end, 0.48)!;
+        // Rotating the full leaf vector makes the bend grow with the blade length
         final bend = _normal(end - base) * (0.25 + random.nextDouble() * 0.15);
         final left = mid + bend;
         final right = mid - bend * 0.74;
@@ -296,12 +312,19 @@ class WoodlandEnclosure extends Component {
 }
 
 /// Returns the current route and the distance along it where the floor begins
+///
+/// The prototype follows the upper branch, stem, and right-hand soil edge as
+/// one contour. The crown branch and the left side of the floor are drawn too
+/// and aren't part of this route
 ({ui.Path path, double groundStart}) woodlandTrail(Vector2 size) {
   final layout = _WoodlandLayout(size);
   return (path: layout.trail, groundStart: layout.groundStart);
 }
 
 /// Shares the surface curves between the enclosure art and the walking route
+///
+/// Position fractions stretch with viewport width and height. The renderer
+/// scales widths and details by the short side to keep them proportional
 class _WoodlandLayout {
   _WoodlandLayout(Vector2 size) {
     final w = size.x;
@@ -327,7 +350,8 @@ class _WoodlandLayout {
       ..cubicTo(w * 0.19, h * 0.80, w * 0.47, root.dy, root.dx, root.dy)
       ..extendWithPath(groundTrail, ui.Offset.zero);
 
-    // The continuous contour lets the gait sample across both joins by distance
+    // Measure the branch and stem before extending the contour. This is the
+    // exact path distance where floor behavior and floor foot placement begin
     trail = ui.Path.from(upperBranch)..extendWithPath(stem, ui.Offset.zero);
     groundStart = trail.computeMetrics().firstOrNull?.length ?? 0;
     trail.extendWithPath(groundTrail, ui.Offset.zero);
