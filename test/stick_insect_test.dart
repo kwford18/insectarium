@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:insect_sanctuary/specimen.dart';
 import 'package:insect_sanctuary/specimen_journal.dart';
 import 'package:insect_sanctuary/stick_insect.dart';
 
@@ -9,7 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('all six feet rest on the soil line after the walk', () async {
-    final journal = SpecimenJournal();
+    final journal = SpecimenJournal(specimen: woodlandStickInsect);
     addTearDown(journal.dispose);
     final insect =
         StickInsect(
@@ -33,7 +34,7 @@ void main() {
     addTearDown(image.dispose);
     final pixels = (await image.toByteData())!;
 
-    // These six separated endpoints are the planted positions on this fixture.
+    // These six separated endpoints are the planted positions on this fixture
     for (final x in [296, 304, 311, 333, 340, 348]) {
       final covered = [
         x - 1,

@@ -52,7 +52,7 @@ class SpecimenJournalView extends StatelessWidget {
                       padding: const EdgeInsets.only(right: 6),
                       child: ListenableBuilder(
                         listenable: journal,
-                        builder: (context, _) => _contents(context),
+                        builder: (context, _) => _contents(),
                       ),
                     ),
                   ),
@@ -65,10 +65,13 @@ class SpecimenJournalView extends StatelessWidget {
     );
   }
 
-  Widget _contents(BuildContext context) {
+  Widget _contents() {
     final facts = journal.facts;
     final entries = journal.recentActivity;
-    final localizations = MaterialLocalizations.of(context);
+    final species = journal.species;
+    final stage = species.stages[journal.stageId]!.label;
+    final stagesSeen = journal.stagesSeen;
+    final behavior = journal.behaviorLabel;
 
     return DefaultTextStyle.merge(
       style: const TextStyle(color: _ink, height: 1.35),
@@ -77,21 +80,21 @@ class SpecimenJournalView extends StatelessWidget {
         children: [
           Semantics(
             header: true,
-            child: const Text(
-              'Stick insect',
-              style: TextStyle(fontFamily: 'YoungSerif', fontSize: 28),
+            child: Text(
+              species.name,
+              style: const TextStyle(fontFamily: 'YoungSerif', fontSize: 28),
             ),
           ),
           const SizedBox(height: 8),
-          Text('${journal.activity.label} · ${journal.location.label}'),
-          const SizedBox(height: 16),
-          _heading('Metrics'),
-          _metric('On branches', journal.branchSeconds),
-          _metric('In leaf litter', journal.groundSeconds),
-          _metric('Resting', journal.restSeconds),
+          Text(stage),
+          if (behavior != null) Text(behavior),
+          for (final morph in journal.morphs) Text('Morph · $morph'),
+          if (stagesSeen.length > 1)
+            Text(stagesSeen.map((id) => species.stages[id]!.label).join(' → ')),
           const SizedBox(height: 16),
           _heading('What we’ve learned'),
-          if (facts.isEmpty)
+          if (facts.isEmpty &&
+              stagesSeen.every((id) => journal.foodEatenIn(id).isEmpty))
             const Text('Discoveries appear as this specimen explores.')
           else
             for (final fact in facts)
@@ -99,9 +102,14 @@ class SpecimenJournalView extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(fact),
               ),
+          for (final stageId in stagesSeen)
+            for (final food in journal.foodEatenIn(stageId).values)
+              Text(
+                '${food.name} · ${species.stages[stageId]!.label} · ${food.count} feedings',
+              ),
           const Divider(height: 24),
           ExpansionTile(
-            key: const PageStorageKey('recent-specimen-activity'),
+            key: ValueKey(journal.specimen.id),
             tilePadding: EdgeInsets.zero,
             childrenPadding: const EdgeInsets.only(bottom: 2),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
@@ -109,23 +117,7 @@ class SpecimenJournalView extends StatelessWidget {
             subtitle: entries.isEmpty
                 ? const Text('No entries yet')
                 : Text('${entries.length} recorded'),
-            children: [
-              for (final entry in entries)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(entry.message),
-                      Text(
-                        '${localizations.formatShortDate(entry.recordedAt.toLocal())} · '
-                        '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(entry.recordedAt.toLocal()))}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
+            children: [_ActivityEntries(entries: entries)],
           ),
           if (!journal.canSave)
             const Text(
@@ -139,20 +131,36 @@ class SpecimenJournalView extends StatelessWidget {
 
   static Widget _heading(String label) =>
       Text(label, style: const TextStyle(fontWeight: FontWeight.w600));
+}
 
-  static Widget _metric(String label, int seconds) {
-    final minutes = seconds ~/ 60;
-    final remainder = seconds % 60;
-    final value = minutes == 0 ? '${remainder}s' : '${minutes}m ${remainder}s';
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          Expanded(child: Text(label)),
-          const SizedBox(width: 12),
-          Text(value),
-        ],
-      ),
+// The expansion tile mounts these rows on demand, deferring timestamp formatting
+class _ActivityEntries extends StatelessWidget {
+  const _ActivityEntries({required this.entries});
+
+  final List<JournalEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: entries.map((entry) {
+        final recordedAt = entry.recordedAt.toLocal();
+        final date = localizations.formatShortDate(recordedAt);
+        final time = localizations.formatTimeOfDay(
+          TimeOfDay.fromDateTime(recordedAt),
+        );
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(entry.message),
+              Text('$date · $time', style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

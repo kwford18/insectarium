@@ -4,26 +4,43 @@ import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'specimen.dart';
 import 'specimen_journal.dart';
 import 'specimen_journal_view.dart';
 import 'stick_insect.dart';
 import 'woodland_enclosure.dart';
 
 const _journalOverlay = 'specimenJournal';
-const _journalKey = 'woodland.stickInsect.journal.v1';
+const _legacyJournalKey = 'woodland.stickInsect.journal.v1';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final preferences = SharedPreferencesAsync();
+  const specimen = woodlandStickInsect;
+  final journalKey = 'specimen.journal.v2.${specimen.id}';
   final SpecimenJournal journal;
   try {
+    var snapshot = await preferences.getString(journalKey);
+    if (snapshot == null) {
+      snapshot = migrateWoodlandJournal(
+        await preferences.getString(_legacyJournalKey),
+      );
+      if (snapshot != null) {
+        try {
+          await preferences.setString(journalKey, snapshot);
+        } catch (error) {
+          debugPrint('Could not save the migrated specimen journal: $error');
+        }
+      }
+    }
     journal = SpecimenJournal(
-      snapshot: await preferences.getString(_journalKey),
-      persist: (snapshot) => preferences.setString(_journalKey, snapshot),
+      specimen: specimen,
+      snapshot: snapshot,
+      persist: (snapshot) => preferences.setString(journalKey, snapshot),
     );
   } catch (error) {
     debugPrint('Could not load the specimen journal: $error');
-    runApp(SanctuaryApp(journal: SpecimenJournal()));
+    runApp(SanctuaryApp(journal: SpecimenJournal(specimen: specimen)));
     return;
   }
   runApp(SanctuaryApp(journal: journal));

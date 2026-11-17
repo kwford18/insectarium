@@ -5,6 +5,7 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 
 import 'specimen_journal.dart';
+import 'specimen_observation.dart';
 
 class StickInsect extends Component with TapCallbacks {
   StickInsect({
@@ -31,6 +32,7 @@ class StickInsect extends Component with TapCallbacks {
   double _groundStart = 0.0;
   double _walkDistance = 0.0;
   double _elapsed = 0.0;
+  String? _reportedBehavior;
 
   @override
   void onGameResize(Vector2 size) {
@@ -49,7 +51,7 @@ class StickInsect extends Component with TapCallbacks {
     _scale = math.min(size.x, size.y) / 400;
     final stride = _stride * _scale;
     final margin = math.min(55 * _scale, trail.length / 4);
-    // A whole number of strides lets all six feet settle at the end.
+    // A whole number of strides lets all six feet settle at the end
     _walkDistance = ((trail.length - 2 * margin) / stride).floor() * stride;
     _start = (trail.length - _walkDistance) / 2;
   }
@@ -57,21 +59,60 @@ class StickInsect extends Component with TapCallbacks {
   @override
   void update(double dt) {
     super.update(dt);
-    if (_trail == null) return;
+    if (_trail == null || dt <= 0) return;
 
+    final previousTravel = _travel;
     _elapsed += dt;
     final travel = _travel;
+    final wasOnGround = _start + previousTravel >= _groundStart;
     final onGround = _start + travel >= _groundStart;
     final moving = travel > 0 && travel < _walkDistance;
-    journal.observe(
-      dt,
-      location: onGround
-          ? SpecimenLocation.leafLitter
-          : SpecimenLocation.branches,
-      activity: moving
-          ? (onGround ? SpecimenActivity.walking : SpecimenActivity.climbing)
-          : SpecimenActivity.resting,
-    );
+    final behavior = moving ? (onGround ? 'walking' : 'climbing') : 'resting';
+    final reachedGround = onGround && !wasOnGround;
+    final restedOnGround =
+        onGround && !moving && previousTravel < _walkDistance;
+    if (_reportedBehavior == behavior && !reachedGround && !restedOnGround) {
+      return;
+    }
+
+    final specimenId = journal.specimen.id;
+    final stageId = journal.stageId;
+    final now = DateTime.now();
+
+    if (_reportedBehavior != behavior) {
+      _reportedBehavior = behavior;
+      journal.observe(
+        BehaviorChanged(
+          specimenId: specimenId,
+          stageId: stageId,
+          recordedAt: now,
+          behaviorId: behavior,
+        ),
+      );
+    }
+    if (reachedGround) {
+      journal.observe(
+        DiscoveryObserved(
+          specimenId: specimenId,
+          stageId: stageId,
+          recordedAt: now,
+          id: 'visitedLeafLitter',
+          description: 'Explores leaf litter as well as branches.',
+          activityMessage: 'Reached the leaf litter',
+        ),
+      );
+    }
+    if (restedOnGround) {
+      journal.observe(
+        DiscoveryObserved(
+          specimenId: specimenId,
+          stageId: stageId,
+          recordedAt: now,
+          id: 'restedOnGround',
+          description: 'Has rested on the enclosure floor.',
+        ),
+      );
+    }
   }
 
   @override
@@ -163,7 +204,7 @@ class StickInsect extends Component with TapCallbacks {
       1.0,
     );
 
-    // Until swing begins, the anchor depends on the step number alone.
+    // Until swing begins, the anchor depends on the step number alone
     final anchor = (wholeSteps - phaseOffset + _stanceFraction / 2) * _stride;
     final reach = (leg - 1) * 22 + (side == 0 ? -4 : 3);
     final footDistance =
