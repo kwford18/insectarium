@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'specimen.dart';
 import 'specimen_observation.dart';
 
+/// A dated observation shown in the specimen's recent activity
 class JournalEntry {
   const JournalEntry(this.message, this.recordedAt);
 
@@ -13,8 +14,13 @@ class JournalEntry {
   final DateTime recordedAt;
 }
 
+/// The number of times a specimen ate a particular food during one stage
 typedef FoodRecord = ({String name, int count});
 
+/// Keeps the live status and accumulated observations for one specimen
+///
+/// Discoveries and feeding records have their own storage in the journal so
+/// they remain available after their activity entries roll off the list
 class SpecimenJournal extends ChangeNotifier {
   SpecimenJournal({required this.specimen, String? snapshot, this._persist})
     : _stageId = specimen.species.initialStageId {
@@ -50,6 +56,9 @@ class SpecimenJournal extends ChangeNotifier {
   Map<String, FoodRecord> foodEatenIn(String stageId) =>
       Map.unmodifiable(_foodByStage[stageId] ?? const {});
 
+  /// Applies an observation for this individual and its current stage
+  ///
+  /// Returns whether it changed the journal. Durable changes schedule a save
   bool observe(SpecimenObservation observation) {
     if (observation.specimenId != specimen.id ||
         observation.stageId != _stageId) {
@@ -58,6 +67,7 @@ class SpecimenJournal extends ChangeNotifier {
     final bool accepted;
     switch (observation) {
       case BehaviorChanged():
+        // The simulation supplies this live status again after a restart
         return _recordBehavior(observation);
       case DiscoveryObserved():
         accepted = _recordDiscovery(observation);
@@ -101,6 +111,7 @@ class SpecimenJournal extends ChangeNotifier {
       name: event.foodName,
       count: (prior?.count ?? 0) + 1,
     );
+    // Keep repeated feedings in the count and reserve the log for firsts
     if (prior == null) {
       final stage = species.stages[event.stageId]!.label;
       _addEntry('Ate ${event.foodName} · $stage', event.recordedAt);
@@ -136,6 +147,7 @@ class SpecimenJournal extends ChangeNotifier {
     if (_entries.length > entryLimit) _entries.removeLast();
   }
 
+  /// Waits for queued writes and schedules a snapshot if the journal is dirty
   Future<void> save() {
     final persist = _persist;
     if (persist == null || !_dirty) return _pendingSave;
@@ -164,6 +176,7 @@ class SpecimenJournal extends ChangeNotifier {
       ],
     });
     _dirty = false;
+    // Write in observation order so an older snapshot cannot overwrite a newer one
     _pendingSave = _pendingSave.then((_) async {
       final previouslyFailed = _saveFailed;
       try {
@@ -227,6 +240,7 @@ class SpecimenJournal extends ChangeNotifier {
 
     final activity = state['activity'];
     if (activity is List) {
+      // Snapshots store entries newest first, so the cap retains recent events
       for (final entry in activity.whereType<Map<String, dynamic>>()) {
         final message = entry['message'];
         final timestamp = entry['recordedAt'];
@@ -267,6 +281,7 @@ Map<String, dynamic>? _decodeSnapshot(String snapshot) {
   }
 }
 
+/// Carries the original woodland discoveries and activity into a specimen save
 String? migrateWoodlandJournal(String? snapshot) {
   if (snapshot == null) return null;
   final old = _decodeSnapshot(snapshot);

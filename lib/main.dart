@@ -13,6 +13,7 @@ import 'woodland_enclosure.dart';
 const _journalOverlay = 'specimenJournal';
 const _legacyJournalKey = 'woodland.stickInsect.journal.v1';
 
+/// Loads the saved specimen history before mounting the game
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final preferences = SharedPreferencesAsync();
@@ -22,6 +23,7 @@ Future<void> main() async {
   try {
     var snapshot = await preferences.getString(journalKey);
     if (snapshot == null) {
+      // The original prototype stored its single journal under a fixed key
       snapshot = migrateWoodlandJournal(
         await preferences.getString(_legacyJournalKey),
       );
@@ -39,6 +41,7 @@ Future<void> main() async {
       persist: (snapshot) => preferences.setString(journalKey, snapshot),
     );
   } catch (error) {
+    // Local storage failures still allow a playable session with a live journal
     debugPrint('Could not load the specimen journal: $error');
     runApp(SanctuaryApp(journal: SpecimenJournal(specimen: specimen)));
     return;
@@ -46,6 +49,7 @@ Future<void> main() async {
   runApp(SanctuaryApp(journal: journal));
 }
 
+/// Hosts the Flame scene and its Flutter journal overlay
 class SanctuaryApp extends StatelessWidget {
   SanctuaryApp({super.key, required SpecimenJournal journal})
     : _game = _TerrariumGame(journal);
@@ -72,6 +76,7 @@ class SanctuaryApp extends StatelessWidget {
 
 class _TerrariumGame extends FlameGame {
   _TerrariumGame(this.journal) {
+    // Split enclosure art across layers so foliage can partly hide the insect
     addAll([
       WoodlandEnclosure(),
       StickInsect(
@@ -88,6 +93,7 @@ class _TerrariumGame extends FlameGame {
   @override
   void lifecycleStateChange(AppLifecycleState state) {
     super.lifecycleStateChange(state);
+    // Flush dirty journal state when the app loses focus, including failed saves
     if (state != AppLifecycleState.resumed) unawaited(journal.save());
   }
 }

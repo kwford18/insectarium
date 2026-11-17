@@ -34,7 +34,7 @@ void main() {
     addTearDown(image.dispose);
     final pixels = (await image.toByteData())!;
 
-    // These six separated endpoints are the planted positions on this fixture
+    // Check rendered contact at each expected foot position on the fixture's soil line
     for (final x in [296, 304, 311, 333, 340, 348]) {
       final covered = [
         x - 1,

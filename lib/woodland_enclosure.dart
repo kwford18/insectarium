@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 
+/// Paints the static woodland scene in layers around the specimen
 class WoodlandEnclosure extends Component {
   WoodlandEnclosure({this.foreground = false})
     : super(priority: foreground ? 1 : -1);
@@ -15,6 +16,7 @@ class WoodlandEnclosure extends Component {
     super.onGameResize(size);
     if (size.x <= 0 || size.y <= 0) return;
 
+    // Cache the drawing until the layout changes to avoid tracing it each frame
     final recorder = ui.PictureRecorder();
     final canvas = ui.Canvas(recorder);
     final layout = _WoodlandLayout(size);
@@ -87,6 +89,7 @@ class WoodlandEnclosure extends Component {
 
   void _paintWash(ui.Canvas canvas, Vector2 size, double scale) {
     canvas.drawColor(const ui.Color(0xFFF4E9D2), ui.BlendMode.src);
+    // Fixed seeds keep the procedural artwork reproducible on resize
     final random = math.Random(37);
     final paint = ui.Paint();
     for (var i = 0; i < 24; i++) {
@@ -196,6 +199,7 @@ class WoodlandEnclosure extends Component {
     final left = <ui.Offset>[];
     final right = <ui.Offset>[];
     final grain = ui.Path();
+    // Offset the sampled centerline on both sides to taper the branch silhouette
     for (var i = 0; i <= 30; i++) {
       final t = i / 30;
       final tangent = curve.getTangentForOffset(t * curve.length)!;
@@ -291,12 +295,13 @@ class WoodlandEnclosure extends Component {
   }
 }
 
+/// Returns the current route and the distance along it where the floor begins
 ({ui.Path path, double groundStart}) woodlandTrail(Vector2 size) {
   final layout = _WoodlandLayout(size);
   return (path: layout.trail, groundStart: layout.groundStart);
 }
 
-/// All three surfaces meet at the exact points used by the walking path.
+/// Shares the surface curves between the enclosure art and the walking route
 class _WoodlandLayout {
   _WoodlandLayout(Vector2 size) {
     final w = size.x;
@@ -322,6 +327,7 @@ class _WoodlandLayout {
       ..cubicTo(w * 0.19, h * 0.80, w * 0.47, root.dy, root.dx, root.dy)
       ..extendWithPath(groundTrail, ui.Offset.zero);
 
+    // The continuous contour lets the gait sample across both joins by distance
     trail = ui.Path.from(upperBranch)..extendWithPath(stem, ui.Offset.zero);
     groundStart = trail.computeMetrics().firstOrNull?.length ?? 0;
     trail.extendWithPath(groundTrail, ui.Offset.zero);

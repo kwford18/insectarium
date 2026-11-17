@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'specimen_journal.dart';
 
+/// Displays the journal over the enclosure while the simulation keeps running
 class SpecimenJournalView extends StatelessWidget {
   const SpecimenJournalView({
     super.key,
@@ -133,7 +134,7 @@ class SpecimenJournalView extends StatelessWidget {
       Text(label, style: const TextStyle(fontWeight: FontWeight.w600));
 }
 
-// The expansion tile mounts these rows on demand, deferring timestamp formatting
+// The tile mounts this widget on expansion, so opening the journal skips timestamp formatting
 class _ActivityEntries extends StatelessWidget {
   const _ActivityEntries({required this.entries});
 

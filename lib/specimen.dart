@@ -1,3 +1,4 @@
+/// A lifecycle stage and the stages this species can enter from it
 class LifeStageDefinition {
   const LifeStageDefinition(this.label, {this.nextStages = const {}});
 
@@ -5,6 +6,9 @@ class LifeStageDefinition {
   final Set<String> nextStages;
 }
 
+/// Shared labels and lifecycle rules for all specimens of a species
+///
+/// IDs are stable across saves so display labels can change independently
 class SpeciesDefinition {
   const SpeciesDefinition({
     required this.id,
@@ -21,6 +25,7 @@ class SpeciesDefinition {
   final Map<String, String> behaviors;
 }
 
+/// An individual whose identity stays the same across life-stage changes
 class Specimen {
   const Specimen({required this.id, required this.species});
 

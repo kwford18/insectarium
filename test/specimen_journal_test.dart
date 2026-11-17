@@ -6,6 +6,7 @@ import 'package:insect_sanctuary/specimen.dart';
 import 'package:insect_sanctuary/specimen_journal.dart';
 import 'package:insect_sanctuary/specimen_observation.dart';
 
+// A species with multiple stages exercises the same journal through metamorphosis
 const _caterpillar = Specimen(
   id: 'caterpillar-1',
   species: SpeciesDefinition(
@@ -214,6 +215,7 @@ void main() {
       expect(find.text('Specimen journal'), findsNothing);
       expect(journal.recentActivity, isEmpty);
 
+      // Advance the live Flame walk while the journal overlay is closed
       for (var frame = 0; frame < 115; frame++) {
         await tester.pump(const Duration(milliseconds: 100));
       }

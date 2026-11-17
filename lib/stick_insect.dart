@@ -7,6 +7,10 @@ import 'package:flame/events.dart';
 import 'specimen_journal.dart';
 import 'specimen_observation.dart';
 
+/// Animates the woodland stick insect along an enclosure-supplied route
+///
+/// Body position and foot placement use the same path so the gait stays
+/// attached to the branch and follows its transition onto the floor
 class StickInsect extends Component with TapCallbacks {
   StickInsect({
     required this.trailPath,
@@ -51,8 +55,9 @@ class StickInsect extends Component with TapCallbacks {
     _scale = math.min(size.x, size.y) / 400;
     final stride = _stride * _scale;
     final margin = math.min(55 * _scale, trail.length / 4);
-    // A whole number of strides lets all six feet settle at the end
+    // Whole strides let all six feet settle at the end
     _walkDistance = ((trail.length - 2 * margin) / stride).floor() * stride;
+    // Center the walk to leave room for foot placement at both ends
     _start = (trail.length - _walkDistance) / 2;
   }
 
@@ -71,6 +76,7 @@ class StickInsect extends Component with TapCallbacks {
     final reachedGround = onGround && !wasOnGround;
     final restedOnGround =
         onGround && !moving && previousTravel < _walkDistance;
+    // Report transitions and discoveries without sending events every frame
     if (_reportedBehavior == behavior && !reachedGround && !restedOnGround) {
       return;
     }
@@ -121,6 +127,7 @@ class StickInsect extends Component with TapCallbacks {
     if (trail == null) return false;
 
     final (body, forward, _) = _pose(trail);
+    // Test the tap in the insect's own coordinate system as it turns and scales
     final relative = (ui.Offset(point.x, point.y) - body) / _scale;
     final along = relative.dx * forward.dx + relative.dy * forward.dy;
     final down = relative.dy * forward.dx - relative.dx * forward.dy;
@@ -168,6 +175,7 @@ class StickInsect extends Component with TapCallbacks {
     canvas.restore();
   }
 
+  // The scripted walk eases in and out once, then stays at its endpoint
   double get _travel {
     final duration = _walkDistance / (_walkSpeed * _scale);
     if (duration == 0) return 0;
@@ -195,6 +203,7 @@ class StickInsect extends Component with TapCallbacks {
     int leg,
     ui.Paint paint,
   ) {
+    // Alternate tripods so adjacent legs and opposing legs use opposite phases
     final phaseOffset = (side + leg).isEven ? 0.0 : 0.5;
     final cycle = strideCount + phaseOffset;
     final wholeSteps = cycle.floor();
@@ -204,7 +213,7 @@ class StickInsect extends Component with TapCallbacks {
       1.0,
     );
 
-    // Until swing begins, the anchor depends on the step number alone
+    // Fix the foot on the path during stance, then ease it to the next anchor
     final anchor = (wholeSteps - phaseOffset + _stanceFraction / 2) * _stride;
     final reach = (leg - 1) * 22 + (side == 0 ? -4 : 3);
     final footDistance =
@@ -212,6 +221,7 @@ class StickInsect extends Component with TapCallbacks {
     final footTangent = _tangentAt(trail, footDistance);
     final lift = math.sin(swing * math.pi) * 10;
     final branchGrip = side == 0 ? 6.0 : -2.0;
+    // Blend out the branch grip near the floor so both sides settle on the soil
     final onBranch = ((_groundStart - footDistance) / (9 * _scale)).clamp(
       0.0,
       1.0,
