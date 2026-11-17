@@ -4,7 +4,7 @@ import 'dart:ui' as ui;
 /// Draws the bramble sprig with one visible blade per remaining edible leaf
 ///
 /// Record the curves in local coordinates. A resize only changes the canvas
-/// transform, and eating rerecords this sprig alone
+/// transform, and eating or replanting rerecords this sprig alone
 class WoodlandSprigArt {
   ui.Picture? _picture;
   int? _paintedEatenLeaves;

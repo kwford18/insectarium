@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:insect_sanctuary/specimen.dart';
 import 'package:insect_sanctuary/specimen_journal.dart';
 import 'package:insect_sanctuary/stick_insect.dart';
-import 'package:insect_sanctuary/woodland_feeding.dart';
+import 'package:insect_sanctuary/woodland_sprig.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -53,8 +53,10 @@ void main() {
   test('a hungry insect can eat at the lower sprig on its return', () {
     final journal = SpecimenJournal(specimen: woodlandStickInsect);
     addTearDown(journal.dispose);
-    final feeding = WoodlandFeeding();
-    final lowerFeeding = WoodlandFeeding();
+    final upperSprig = WoodlandSprig();
+    final lowerSprig = WoodlandSprig(uphill: true);
+    final feeding = upperSprig.feeding;
+    final lowerFeeding = lowerSprig.feeding;
     final insect = StickInsect(
       trailPath: (_) => (
         path: ui.Path()
@@ -64,8 +66,8 @@ void main() {
       ),
       journal: journal,
       onObserve: () {},
-      feeding: feeding,
-      lowerFeeding: lowerFeeding,
+      upperSprig: upperSprig,
+      lowerSprig: lowerSprig,
     )..onGameResize(Vector2(400, 760));
 
     insect.update(4);

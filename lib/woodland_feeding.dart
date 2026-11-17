@@ -1,7 +1,7 @@
 /// The edible leaves on one woodland sprig
 ///
 /// The prototype eats them in a fixed order, so the count identifies which
-/// individual leaves are still attached. Only completed meals change it
+/// individual leaves are still attached. A fresh cutting restores the sprig
 class WoodlandFeeding {
   static const foodId = 'bramble-leaf';
   static const foodName = 'Bramble leaf';
@@ -17,5 +17,10 @@ class WoodlandFeeding {
     if (!hasLeaf) return false;
     _eatenLeaves++;
     return true;
+  }
+
+  /// Replaces the leaves on this sprig with a fresh cutting
+  void replenish() {
+    _eatenLeaves = 0;
   }
 }

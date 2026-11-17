@@ -8,9 +8,11 @@ import 'specimen.dart';
 import 'specimen_journal.dart';
 import 'specimen_journal_view.dart';
 import 'stick_insect.dart';
+import 'woodland_cuttings_tray.dart';
 import 'woodland_enclosure.dart';
-import 'woodland_feeding.dart';
+import 'woodland_sprig.dart';
 
+const _cuttingsOverlay = 'woodlandCuttings';
 const _journalOverlay = 'specimenJournal';
 // Keep the original key readable for saves from the single-specimen prototype
 const _legacyJournalKey = 'woodland.stickInsect.journal.v1';
@@ -75,7 +77,10 @@ class SanctuaryApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: GameWidget(
         game: _game,
+        initialActiveOverlays: const [_cuttingsOverlay],
         overlayBuilderMap: {
+          _cuttingsOverlay: (_, _) =>
+              WoodlandCuttingsTray(sprigs: _game.sprigs),
           _journalOverlay: (_, _) => SpecimenJournalView(
             journal: _game.journal,
             onClose: () => _game.overlays.remove(_journalOverlay),
@@ -92,18 +97,20 @@ class _TerrariumGame extends FlameGame {
     // Split enclosure art across layers so foliage can partly hide the insect
     addAll([
       WoodlandEnclosure(),
+      ...sprigs,
       StickInsect(
         trailPath: woodlandTrail,
         journal: journal,
         onObserve: () => overlays.add(_journalOverlay),
-        feeding: WoodlandFeeding(),
-        lowerFeeding: WoodlandFeeding(),
+        upperSprig: sprigs.first,
+        lowerSprig: sprigs.last,
       ),
       WoodlandEnclosure(foreground: true),
     ]);
   }
 
   final SpecimenJournal journal;
+  final sprigs = [WoodlandSprig(), WoodlandSprig(uphill: true)];
 
   @override
   void lifecycleStateChange(AppLifecycleState state) {

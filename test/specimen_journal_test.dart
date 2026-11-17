@@ -5,6 +5,7 @@ import 'package:insect_sanctuary/main.dart';
 import 'package:insect_sanctuary/specimen.dart';
 import 'package:insect_sanctuary/specimen_journal.dart';
 import 'package:insect_sanctuary/specimen_observation.dart';
+import 'package:insect_sanctuary/woodland_cuttings_tray.dart';
 
 // A species with multiple stages exercises the same journal through metamorphosis
 const _caterpillar = Specimen(
@@ -288,5 +289,51 @@ void main() {
     }
     expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 1);
     expect(journal.recentActivity.single.message, 'Ate Bramble leaf · Adult');
+  });
+
+  testWidgets('a cutting replenishes only the stem it is dropped on', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final journal = SpecimenJournal(specimen: woodlandStickInsect);
+    addTearDown(journal.dispose);
+    await tester.pumpWidget(SanctuaryApp(journal: journal));
+    await tester.pump(const Duration(milliseconds: 16));
+
+    final tray = tester.widget<WoodlandCuttingsTray>(
+      find.byType(WoodlandCuttingsTray),
+    );
+    final upper = tray.sprigs.first;
+    final lower = tray.sprigs.last;
+    // Seed the fixture before the hunger clock can produce a real observation
+    upper.feeding.eatLeaf();
+    lower.feeding.eatLeaf();
+
+    Future<void> dropCuttingAt(Offset point) async {
+      final source = tester.getCenter(find.text('Drag bramble cutting'));
+      final gesture = await tester.startGesture(source);
+      // Mount the targets before moving over the chosen drop point
+      await gesture.moveBy(const Offset(0, -24));
+      await tester.pump();
+      expect(find.text('Drop on a stem'), findsOneWidget);
+      await gesture.moveTo(point);
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+    }
+
+    await dropCuttingAt(const Offset(40, 140));
+    expect(upper.feeding.eatenLeaves, 1);
+    expect(lower.feeding.eatenLeaves, 1);
+
+    await dropCuttingAt(lower.dropBounds!.center);
+    expect(upper.feeding.eatenLeaves, 1);
+    expect(lower.feeding.eatenLeaves, 0);
+    expect(journal.foodEatenIn('adult'), isEmpty);
+    expect(journal.recentActivity, isEmpty);
   });
 }
