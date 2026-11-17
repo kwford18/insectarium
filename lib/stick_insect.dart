@@ -22,6 +22,7 @@ class StickInsect extends Component with TapCallbacks {
     required this.journal,
     required this.onObserve,
     this.feeding,
+    this.lowerFeeding,
   });
 
   /// Builds a continuous contour in scene coordinates for the current viewport
@@ -36,8 +37,11 @@ class StickInsect extends Component with TapCallbacks {
   /// Lets the game decide how to present the journal when the insect is tapped
   final void Function() onObserve;
 
-  /// Supplies the optional leaf at this insect's branch rest point
+  /// Supplies leaves at this insect's upper branch rest point
   final WoodlandFeeding? feeding;
+
+  /// Supplies leaves at the lower branch stop on the uphill leg
+  final WoodlandFeeding? lowerFeeding;
 
   static const _stride = StickInsectWalk.strideLength;
   // The tap area includes the thin legs and antennae so the body is easy to select
@@ -54,6 +58,9 @@ class StickInsect extends Component with TapCallbacks {
   final _appetite = StickInsectAppetite();
   final _sprigArt = WoodlandSprigArt();
   ui.Tangent? _sprigAnchor;
+  final _lowerSprigArt = WoodlandSprigArt();
+  ui.Tangent? _lowerSprigAnchor;
+  int? _lowerSprigStride;
 
   @override
   void onGameResize(Vector2 size) {
@@ -81,6 +88,23 @@ class StickInsect extends Component with TapCallbacks {
     _sprigAnchor = feeding == null
         ? null
         : _tangentAt(trail, _start + 18 * _scale);
+    _lowerSprigAnchor = null;
+    _lowerSprigStride = null;
+    // Choose a whole stride on the wood so both tripods plant at the stop.
+    // Taller or shorter layouts keep the sprig between the branch and soil
+    final branchStrides = (_groundStart - _start) / stride;
+    final lowerStop = (branchStrides * 2 / 3).round();
+    if (lowerFeeding != null &&
+        lowerStop > 0 &&
+        lowerStop < branchStrides &&
+        lowerStop < _routeStrides) {
+      _lowerSprigStride = lowerStop;
+      // The insect faces uphill here, so place the sprig ahead in that direction
+      _lowerSprigAnchor = _tangentAt(
+        trail,
+        _start + lowerStop * stride - 18 * _scale,
+      );
+    }
   }
 
   @override
@@ -88,18 +112,28 @@ class StickInsect extends Component with TapCallbacks {
     super.update(dt);
     if (_trail == null || dt <= 0) return;
 
-    final previous = _walk.sample(_routeStrides);
+    final previous = _walk.sample(
+      _routeStrides,
+      lowerSprigStride: _lowerSprigStride,
+    );
     _elapsed += dt;
-    final feeding = this.feeding;
+    final availableSprig = switch (previous.feedingStop) {
+      null => null,
+      0 => feeding,
+      _ => lowerFeeding,
+    };
     final meal = _appetite.advance(
       dt,
-      leafInReach: previous.atBranchRest && (feeding?.hasLeaf ?? false),
+      leafInReach: availableSprig?.hasLeaf ?? false,
     );
-    // Let the existing walk bring a hungry insect back to the sprig. Once a
-    // meal starts, hold the planted branch pose until it finishes
-    final mealCompleted = meal.finished && (feeding?.eatLeaf() ?? false);
+    // Hold the walking clock during a meal so the feet stay planted until the
+    // selected sprig loses a leaf
+    final mealCompleted = meal.finished && (availableSprig?.eatLeaf() ?? false);
     if (!meal.feeding) _walk.advance(dt);
-    final current = _walk.sample(_routeStrides);
+    final current = _walk.sample(
+      _routeStrides,
+      lowerSprigStride: _lowerSprigStride,
+    );
     final wasOnGround =
         _routeDistance(previous.strides, previous.returning) >= _groundStart;
     final onGround =
@@ -177,7 +211,10 @@ class StickInsect extends Component with TapCallbacks {
     final trail = _trail;
     if (trail == null) return false;
 
-    final walk = _walk.sample(_routeStrides);
+    final walk = _walk.sample(
+      _routeStrides,
+      lowerSprigStride: _lowerSprigStride,
+    );
     final (body, forward) = _pose(trail, walk.strides, walk.returning);
     // Undo the body's translation and scale, then project onto its forward and
     // down axes. The same local tap bounds work at every angle along the trail
@@ -200,12 +237,26 @@ class StickInsect extends Component with TapCallbacks {
     final trail = _trail;
     if (trail == null) return;
 
-    final walk = _walk.sample(_routeStrides);
+    final walk = _walk.sample(
+      _routeStrides,
+      lowerSprigStride: _lowerSprigStride,
+    );
     final (body, forward) = _pose(trail, walk.strides, walk.returning);
     final anchor = _sprigAnchor;
     final feeding = this.feeding;
     if (anchor != null && feeding != null) {
       _sprigArt.draw(canvas, anchor, _scale, feeding.eatenLeaves);
+    }
+    final lowerAnchor = _lowerSprigAnchor;
+    final lowerFeeding = this.lowerFeeding;
+    if (lowerAnchor != null && lowerFeeding != null) {
+      _lowerSprigArt.draw(
+        canvas,
+        lowerAnchor,
+        _scale,
+        lowerFeeding.eatenLeaves,
+        uphill: true,
+      );
     }
     StickInsectArt.draw(
       canvas,
@@ -224,6 +275,7 @@ class StickInsect extends Component with TapCallbacks {
   @override
   void onRemove() {
     _sprigArt.dispose();
+    _lowerSprigArt.dispose();
     super.onRemove();
   }
 

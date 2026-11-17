@@ -97,6 +97,7 @@ class _TerrariumGame extends FlameGame {
         journal: journal,
         onObserve: () => overlays.add(_journalOverlay),
         feeding: WoodlandFeeding(),
+        lowerFeeding: WoodlandFeeding(),
       ),
       WoodlandEnclosure(foreground: true),
     ]);

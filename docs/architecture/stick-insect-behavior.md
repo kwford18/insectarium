@@ -2,9 +2,9 @@
 
 The woodland stick insect rests on the upper branch, follows the existing trail to the floor, rests again, and returns uphill. The timed route makes both surfaces observable and preserves planted feet at each stop. The route clock lives in `StickInsectWalk`. The Flame component maps that clock onto the enclosure geometry, renders the gait, and reports observations through the existing journal API.
 
-The prototype starts with four edible leaves on one sprig at the branch rest point. Hunger advances as the insect explores. If it gets hungry while away, the existing route brings it back within reach of the sprig. It pauses to feed, then one leaf disappears and the journal receives one `FoodEaten` observation. The sprig starts fresh on reload. The journal persists completed feedings independently.
+The prototype starts with four edible leaves on each of two sprigs. One is at the upper branch rest point. The other is a brief stop on the climb back from the floor. Hunger advances as the insect explores. A hungry insect can feed at either stop if leaves remain there. It pauses to feed, then one leaf disappears from that sprig and the journal receives one `FoodEaten` observation. The sprigs start fresh on reload. The journal persists completed feedings independently.
 
-The sprig's recorded picture is rebuilt when a leaf is eaten. Its geometry is reused across frames and resized with a canvas transform. The decorative enclosure still uses its own recorded pictures. Before scaling this to the full shrub, measure both Dart and raster frame times in profile mode on a representative phone.
+Each sprig's recorded picture is rebuilt when one of its leaves is eaten. Its geometry is reused across frames and resized with a canvas transform. The decorative enclosure still uses its own recorded pictures. Use the Android emulator on Windows for functional testing. Measure Dart and raster frame times in profile mode on the iPhone when the Mac build is ready.
 
 ## Woodland feeding direction
 

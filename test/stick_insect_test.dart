@@ -50,10 +50,11 @@ void main() {
     }
   });
 
-  test('a hungry insect waits to eat until it returns to the sprig', () {
+  test('a hungry insect can eat at the lower sprig on its return', () {
     final journal = SpecimenJournal(specimen: woodlandStickInsect);
     addTearDown(journal.dispose);
     final feeding = WoodlandFeeding();
+    final lowerFeeding = WoodlandFeeding();
     final insect = StickInsect(
       trailPath: (_) => (
         path: ui.Path()
@@ -64,6 +65,7 @@ void main() {
       journal: journal,
       onObserve: () {},
       feeding: feeding,
+      lowerFeeding: lowerFeeding,
     )..onGameResize(Vector2(400, 760));
 
     insect.update(4);
@@ -81,19 +83,23 @@ void main() {
     expect(journal.recentActivity.first.message, 'Reached the leaf litter');
 
     // The second hunger interval runs out during the trip, away from food
-    insect.update(7);
+    insect.update(6);
     expect(journal.behaviorLabel, 'Climbing');
     expect(feeding.eatenLeaves, 1);
-    insect.update(1);
+    expect(lowerFeeding.eatenLeaves, 0);
+    insect.update(0.75);
     expect(journal.behaviorLabel, 'Resting');
-    // The original branch hit area is reachable again after the return walk
-    expect(insect.containsLocalPoint(Vector2(80, 473)), isTrue);
-    expect(journal.recentActivity, hasLength(2));
-
     insect.update(1);
     expect(journal.behaviorLabel, 'Feeding');
     insect.update(1);
-    expect(feeding.eatenLeaves, 2);
+    expect(feeding.eatenLeaves, 1);
+    expect(lowerFeeding.eatenLeaves, 1);
     expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 2);
+    expect(journal.recentActivity, hasLength(2));
+
+    insect.update(2);
+    expect(journal.behaviorLabel, 'Resting');
+    // The original branch hit area is reachable again after the lower sprig stop
+    expect(insect.containsLocalPoint(Vector2(80, 473)), isTrue);
   });
 }

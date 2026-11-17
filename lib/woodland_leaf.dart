@@ -13,8 +13,9 @@ class WoodlandSprigArt {
     ui.Canvas canvas,
     ui.Tangent anchor,
     double scale,
-    int eatenLeaves,
-  ) {
+    int eatenLeaves, {
+    bool uphill = false,
+  }) {
     if (_picture == null || _paintedEatenLeaves != eatenLeaves) {
       final recorder = ui.PictureRecorder();
       _paintSprig(ui.Canvas(recorder), eatenLeaves);
@@ -25,7 +26,8 @@ class WoodlandSprigArt {
     canvas.save();
     canvas.translate(anchor.position.dx, anchor.position.dy);
     canvas.rotate(math.atan2(anchor.vector.dy, anchor.vector.dx));
-    canvas.scale(scale);
+    // Mirror the sprig toward the uphill approach while keeping it above the wood
+    canvas.scale(uphill ? -scale : scale, scale);
     canvas.drawPicture(_picture!);
     canvas.restore();
   }
