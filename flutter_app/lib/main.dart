@@ -3,10 +3,36 @@ import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
+
+import 'field_note.dart';
+import 'stick_insect.dart';
+
+const _fieldNote = 'fieldNote';
 
 void main() {
-  runApp(GameWidget(game: FlameGame(children: [WoodlandWash()])));
+  final game = FlameGame();
+  game.addAll([
+    WoodlandWash(),
+    StickInsect(
+      branchPath: woodlandBranch,
+      onObserve: () => game.overlays.add(_fieldNote),
+    ),
+  ]);
+
+  runApp(
+    MaterialApp(
+      title: 'Insect Sanctuary',
+      debugShowCheckedModeBanner: false,
+      home: GameWidget(
+        game: game,
+        overlayBuilderMap: {
+          _fieldNote: (_, _) =>
+              FieldNote(onClose: () => game.overlays.remove(_fieldNote)),
+        },
+      ),
+    ),
+  );
 }
 
 class WoodlandWash extends Component {

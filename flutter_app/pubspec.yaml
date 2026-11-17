@@ -18,3 +18,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: YoungSerif
+      fonts:
+        - asset: assets/fonts/young-serif/YoungSerif-Regular.ttf
+  assets:
+    - assets/fonts/young-serif/OFL.txt
