@@ -5,20 +5,20 @@ import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 
 class StickInsect extends Component with TapCallbacks {
-  StickInsect({required this.branchPath, required this.onObserve});
+  StickInsect({required this.trailPath, required this.onObserve});
 
-  final ui.Path Function(Vector2 size) branchPath;
+  final ui.Path Function(Vector2 size) trailPath;
   final void Function() onObserve;
 
   static const _stride = 30.0;
   static const _stanceFraction = 0.64;
   static const _startDelay = 0.8;
-  static const _walkSpeed = 36.0;
+  static const _walkSpeed = 50.0;
   static const _ink = ui.Color(0xFF513523);
   static const _pigment = ui.Color(0xFFB98751);
   static const _tapBounds = ui.Rect.fromLTRB(-46, -20, 56, 36);
 
-  ui.PathMetric? _branch;
+  ui.PathMetric? _trail;
   double _scale = 1.0;
   double _start = 0.0;
   double _walkDistance = 0.0;
@@ -28,34 +28,34 @@ class StickInsect extends Component with TapCallbacks {
   void onGameResize(Vector2 size) {
     super.onGameResize(size);
     if (size.x <= 0 || size.y <= 0) {
-      _branch = null;
+      _trail = null;
       return;
     }
 
-    final branch = branchPath(size).computeMetrics().firstOrNull;
-    _branch = branch;
-    if (branch == null) return;
+    final trail = trailPath(size).computeMetrics().firstOrNull;
+    _trail = trail;
+    if (trail == null) return;
 
     _scale = math.min(size.x, size.y) / 400;
     final stride = _stride * _scale;
-    final margin = math.min(55 * _scale, branch.length / 4);
+    final margin = math.min(55 * _scale, trail.length / 4);
     // A whole number of strides lets all six feet settle at the end.
-    _walkDistance = ((branch.length - 2 * margin) / stride).floor() * stride;
-    _start = (branch.length - _walkDistance) / 2;
+    _walkDistance = ((trail.length - 2 * margin) / stride).floor() * stride;
+    _start = (trail.length - _walkDistance) / 2;
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-    if (_branch != null) _elapsed += dt;
+    if (_trail != null) _elapsed += dt;
   }
 
   @override
   bool containsLocalPoint(Vector2 point) {
-    final branch = _branch;
-    if (branch == null) return false;
+    final trail = _trail;
+    if (trail == null) return false;
 
-    final (body, forward, _) = _pose(branch);
+    final (body, forward, _) = _pose(trail);
     final relative = (ui.Offset(point.x, point.y) - body) / _scale;
     final along = relative.dx * forward.dx + relative.dy * forward.dy;
     final down = relative.dy * forward.dx - relative.dx * forward.dy;
@@ -70,10 +70,10 @@ class StickInsect extends Component with TapCallbacks {
 
   @override
   void render(ui.Canvas canvas) {
-    final branch = _branch;
-    if (branch == null) return;
+    final trail = _trail;
+    if (trail == null) return;
 
-    final (body, forward, strideCount) = _pose(branch);
+    final (body, forward, strideCount) = _pose(trail);
     final legPaint = ui.Paint()
       ..style = ui.PaintingStyle.stroke
       ..strokeCap = ui.StrokeCap.round
@@ -84,7 +84,7 @@ class StickInsect extends Component with TapCallbacks {
       for (var leg = 0; leg < 3; leg++) {
         _drawLeg(
           canvas,
-          branch,
+          trail,
           body,
           forward,
           strideCount,
@@ -103,14 +103,14 @@ class StickInsect extends Component with TapCallbacks {
     canvas.restore();
   }
 
-  (ui.Offset, ui.Offset, double) _pose(ui.PathMetric branch) {
+  (ui.Offset, ui.Offset, double) _pose(ui.PathMetric trail) {
     final duration = _walkDistance / (_walkSpeed * _scale);
     final progress = duration == 0
         ? 0.0
         : ((_elapsed - _startDelay) / duration).clamp(0.0, 1.0);
     final travel = _walkDistance * _ease(progress);
     final strideCount = travel / (_stride * _scale);
-    final tangent = _tangentAt(branch, _start + travel);
+    final tangent = _tangentAt(trail, _start + travel);
     final forward = tangent.vector;
     final bob = (1 - math.cos(strideCount * math.pi * 4)) * 0.6;
     final body = tangent.position + _up(forward) * ((27 + bob) * _scale);
@@ -119,7 +119,7 @@ class StickInsect extends Component with TapCallbacks {
 
   void _drawLeg(
     ui.Canvas canvas,
-    ui.PathMetric branch,
+    ui.PathMetric trail,
     ui.Offset body,
     ui.Offset forward,
     double strideCount,
@@ -140,7 +140,7 @@ class StickInsect extends Component with TapCallbacks {
     final anchor = (wholeSteps - phaseOffset + _stanceFraction / 2) * _stride;
     final reach = (leg - 1) * 22 + (side == 0 ? -4 : 3);
     final footTangent = _tangentAt(
-      branch,
+      trail,
       _start + (anchor + reach + _ease(swing) * _stride) * _scale,
     );
     final lift = math.sin(swing * math.pi) * 10;
@@ -195,8 +195,8 @@ class StickInsect extends Component with TapCallbacks {
     canvas.drawPath(antennae, line);
   }
 
-  static ui.Tangent _tangentAt(ui.PathMetric branch, double distance) {
-    return branch.getTangentForOffset(distance.clamp(0.0, branch.length))!;
+  static ui.Tangent _tangentAt(ui.PathMetric trail, double distance) {
+    return trail.getTangentForOffset(distance.clamp(0.0, trail.length))!;
   }
 
   static ui.Offset _up(ui.Offset forward) => ui.Offset(forward.dy, -forward.dx);
