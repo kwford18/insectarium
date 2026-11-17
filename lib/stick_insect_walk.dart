@@ -1,8 +1,8 @@
 /// The current stick-insect route schedule, measured in complete strides
 ///
-/// It rests on the upper branch, walks down the existing trail, rests on the
-/// floor, and climbs back. See docs/architecture/stick-insect-behavior.md for
-/// the planned behavior work
+/// Each cycle leaves one branch, rests on the shared floor, and climbs to
+/// the other branch when available. The contour only changes at floor rest
+/// or after completing a full trip
 class StickInsectWalk {
   /// Distance of one complete gait cycle at the reference viewport scale
   static const strideLength = 30.0;
@@ -12,37 +12,48 @@ class StickInsectWalk {
   static const _sprigRest = 0.8;
 
   int _strideCount = 0;
+  int? _crownStrides;
+  bool _startsAtCrown = false;
   bool _hasReturnStops = false;
   double _phase = 0;
   int? _returnStop;
 
-  double get _walkTime => _strideCount * strideLength / _walkSpeed;
-  double get _returnStart => _branchRest + _walkTime + _floorRest;
+  bool get returnsToCrown => !_startsAtCrown && _crownStrides != null;
+  int get _outboundStrides => _startsAtCrown ? _crownStrides! : _strideCount;
+  int get _returnStrides => returnsToCrown ? _crownStrides! : _strideCount;
+  double get _outboundTime => _outboundStrides * strideLength / _walkSpeed;
+  double get _returnTime => _returnStrides * strideLength / _walkSpeed;
+  double get _returnStart => _branchRest + _outboundTime + _floorRest;
   double get _returnAllowance => _hasReturnStops ? _sprigRest : 0;
-  double get _cycleTime => _returnStart + _walkTime + _returnAllowance;
+  double get _cycleTime => _returnStart + _returnTime + _returnAllowance;
 
-  /// The chosen feeding stop on the uphill leg, measured from the upper end
+  /// The chosen feeding stop measured in strides from the shared floor rest
   int? get returnStop => _returnStop;
 
   /// Travel time from the floor to a candidate stop on the uphill leg
-  double secondsToReturnStop(int stop) =>
-      (_strideCount - stop) * strideLength / _walkSpeed;
+  double secondsToReturnStop(int stop) => stop * strideLength / _walkSpeed;
 
   /// Rescales the route clock and keeps an active meal at its relocated stop
   void configure(
     int strideCount, {
+    required int? crownStrides,
     required bool hasReturnStops,
     required int? relocatedReturnStop,
   }) {
     if (_strideCount == strideCount &&
+        _crownStrides == crownStrides &&
         _hasReturnStops == hasReturnStops &&
         _returnStop == relocatedReturnStop) {
       return;
     }
     final restingAt = sample().feedingStop;
     final progress = _phase / _cycleTime;
-    if (_strideCount != strideCount || _hasReturnStops != hasReturnStops) {
+    if (_strideCount != strideCount ||
+        _crownStrides != crownStrides ||
+        _hasReturnStops != hasReturnStops) {
       _strideCount = strideCount;
+      _crownStrides = crownStrides;
+      if (crownStrides == null) _startsAtCrown = false;
       _hasReturnStops = hasReturnStops;
       _phase = progress * _cycleTime;
     }
@@ -67,12 +78,14 @@ class StickInsectWalk {
     if (_strideCount == 0) return;
     final previous = _phase;
     final next = previous + seconds;
-    final wrapped = next >= _cycleTime;
+    final cycles = (next / _cycleTime).floor();
     _phase = next % _cycleTime;
-    if (wrapped) _returnStop = null;
+    if (cycles > 0) _returnStop = null;
+    // Both routes use the same total travel time across the two legs
+    if (_crownStrides != null && cycles.isOdd) _startsAtCrown = !_startsAtCrown;
     if (_hasReturnStops &&
         _phase >= _returnStart &&
-        (wrapped || previous < _returnStart)) {
+        (cycles > 0 || previous < _returnStart)) {
       _returnStop = chooseReturnStop();
     }
   }
@@ -81,33 +94,37 @@ class StickInsectWalk {
   ///
   /// Reversing starts a new gait at stride zero. Each end of the route is a
   /// whole stride away so a rest always starts with both tripods planted.
-  /// Feeding stops are counted from the upper end, even on the return leg
-  ({double strides, bool returning, bool moving, int? feedingStop}) sample() {
-    final strideCount = _strideCount;
-    if (strideCount == 0) {
-      return (strides: 0, returning: false, moving: false, feedingStop: 0);
-    }
+  /// Both contours measure shared feeding stops from their aligned floor rest
+  ({double strides, bool returning, bool crown, bool moving, int? feedingStop})
+  sample() {
     // The caller scales distance and speed together, so timing uses unscaled units
-    final walkTime = _walkTime;
-    final floorArrival = _branchRest + walkTime;
+    final floorArrival = _branchRest + _outboundTime;
     final returnStart = _returnStart;
     final phase = _phase;
-    if (phase < _branchRest) {
-      return (strides: 0, returning: false, moving: false, feedingStop: 0);
+    if (_strideCount == 0 || phase < _branchRest) {
+      return (
+        strides: 0,
+        returning: false,
+        crown: _startsAtCrown,
+        moving: false,
+        feedingStop: _startsAtCrown ? null : 0,
+      );
     }
     if (phase < floorArrival) {
-      final progress = (phase - _branchRest) / walkTime;
+      final progress = (phase - _branchRest) / _outboundTime;
       return (
-        strides: strideCount * _ease(progress),
+        strides: _outboundStrides * _ease(progress),
         returning: false,
+        crown: _startsAtCrown,
         moving: true,
         feedingStop: null,
       );
     }
     if (phase < returnStart) {
       return (
-        strides: strideCount.toDouble(),
+        strides: _outboundStrides.toDouble(),
         returning: false,
+        crown: _startsAtCrown,
         moving: false,
         feedingStop: null,
       );
@@ -117,12 +134,12 @@ class StickInsectWalk {
     if (stop != null) {
       // Split the climb into two eased walks so the insect slows into the
       // sprig and resumes from a planted gait phase after the stop
-      final beforeSprig = strideCount - stop;
       final timeToSprig = secondsToReturnStop(stop);
       if (returnTime < timeToSprig) {
         return (
-          strides: beforeSprig * _ease(returnTime / timeToSprig),
+          strides: stop * _ease(returnTime / timeToSprig),
           returning: true,
+          crown: returnsToCrown,
           moving: true,
           feedingStop: null,
         );
@@ -130,24 +147,28 @@ class StickInsectWalk {
       final afterRest = returnTime - timeToSprig - _sprigRest;
       if (afterRest < 0) {
         return (
-          strides: beforeSprig.toDouble(),
+          strides: stop.toDouble(),
           returning: true,
+          crown: returnsToCrown,
           moving: false,
           feedingStop: stop,
         );
       }
-      final remainingTime = walkTime - timeToSprig;
+      final remainingTime = _returnTime - timeToSprig;
       return (
-        strides: beforeSprig + stop * _ease(afterRest / remainingTime),
+        strides:
+            stop + (_returnStrides - stop) * _ease(afterRest / remainingTime),
         returning: true,
+        crown: returnsToCrown,
         moving: true,
         feedingStop: null,
       );
     }
-    final progress = returnTime / (walkTime + _returnAllowance);
+    final progress = returnTime / (_returnTime + _returnAllowance);
     return (
-      strides: strideCount * _ease(progress),
+      strides: _returnStrides * _ease(progress),
       returning: true,
+      crown: returnsToCrown,
       moving: true,
       feedingStop: null,
     );

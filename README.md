@@ -26,6 +26,8 @@ Open the repository root in VS Code with the Dart and Flutter extensions. The pr
 - Start the emulator or connect a phone with USB debugging enabled and authorize the computer when prompted. Run `flutter devices` to confirm Flutter can see it.
 - In VS Code, select the Android device in the status bar and press **F5** to run with debugging and hot reload.
 
+During a debug session, click the lightning bolt on the VS Code debug toolbar to hot reload. If you launched from the terminal with `flutter run`, press lowercase `r` in that terminal. Use **Flutter: Hot Restart** from the VS Code command palette or uppercase `R` in the terminal when changing how the Flame scene is constructed. [Flutter hot reload](https://docs.flutter.dev/tools/hot-reload)
+
 Use the Android emulator on Windows to check layout and interaction. For frame timing, run a profile build on the iPhone from a Mac with Xcode and inspect the UI and raster tracks in Flutter DevTools. Replace `<device-id>` with the ID from `flutter devices`. [Flutter iOS setup](https://docs.flutter.dev/platform-integration/ios/setup) · [Flutter performance profiling](https://docs.flutter.dev/perf/ui-performance)
 
 ```powershell

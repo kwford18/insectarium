@@ -100,6 +100,7 @@ class _TerrariumGame extends FlameGame {
       ...sprigs,
       StickInsect(
         trailPath: woodlandTrail,
+        crownTrailPath: woodlandCrownTrail,
         journal: journal,
         onObserve: () => overlays.add(_journalOverlay),
         feedingSprigs: sprigs,

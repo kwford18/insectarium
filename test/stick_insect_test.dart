@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:insect_sanctuary/specimen.dart';
 import 'package:insect_sanctuary/specimen_journal.dart';
 import 'package:insect_sanctuary/stick_insect.dart';
+import 'package:insect_sanctuary/stick_insect_trail.dart';
+import 'package:insect_sanctuary/woodland_enclosure.dart';
 import 'package:insect_sanctuary/woodland_sprig.dart';
 
 void main() {
@@ -139,5 +141,59 @@ void main() {
     expect(middle.feeding.eatenLeaves, 1);
     expect(lower.feeding.hasLeaf, isFalse);
     expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 2);
+  });
+
+  test('the insect alternates branches through a shared floor stop', () {
+    final journal = SpecimenJournal(specimen: woodlandStickInsect);
+    addTearDown(journal.dispose);
+    final size = Vector2(420, 760);
+    final insect = StickInsect(
+      trailPath: woodlandTrail,
+      crownTrailPath: woodlandCrownTrail,
+      journal: journal,
+      onObserve: () {},
+    )..onGameResize(size);
+    final upperRoute = woodlandTrail(size);
+    final crownRoute = woodlandCrownTrail(size);
+    final upper = StickInsectTrail(
+      metric: upperRoute.path.computeMetrics().first,
+      groundStart: upperRoute.groundStart,
+      scale: 1.05,
+    );
+    final crown = StickInsectTrail(
+      metric: crownRoute.path.computeMetrics().first,
+      groundStart: crownRoute.groundStart,
+      scale: 1.05,
+      sharedFloorMargin: upper.floorMargin,
+    );
+    final floorGap =
+        upper.tangentAt(upper.end).position -
+        crown.tangentAt(crown.end).position;
+    expect(floorGap.distance, lessThan(0.2));
+
+    Vector2 restPoint(StickInsectTrail trail) {
+      final tangent = trail.tangentAt(trail.start);
+      final up = ui.Offset(tangent.vector.dy, -tangent.vector.dx);
+      final body = tangent.position + up * (27 * trail.scale);
+      return Vector2(body.dx, body.dy);
+    }
+
+    bool reachRest(Vector2 point) {
+      // Advance in short ticks to catch the real floor turn and branch rest
+      for (var frame = 0; frame < 240; frame++) {
+        insect.update(0.2);
+        if (journal.behaviorLabel == 'Resting' &&
+            insect.containsLocalPoint(point)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    final upperRest = restPoint(upper);
+    expect(insect.containsLocalPoint(upperRest), isTrue);
+    expect(reachRest(restPoint(crown)), isTrue);
+    expect(reachRest(upperRest), isTrue);
+    expect(journal.recentActivity.single.message, 'Reached the leaf litter');
   });
 }

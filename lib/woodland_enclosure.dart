@@ -313,12 +313,22 @@ class WoodlandEnclosure extends Component {
 
 /// Returns the current route and the distance along it where the floor begins
 ///
-/// The prototype uses the upper branch, stem, and right-hand soil edge as
-/// one contour. The crown branch and the left side of the floor are drawn too
-/// and aren't part of this route
+/// The upper branch meets the stem and right-hand soil edge in one contour
 ({ui.Path path, double groundStart}) woodlandTrail(Vector2 size) {
   final layout = _WoodlandLayout(size);
   return (path: layout.trail, groundStart: layout.groundStart);
+}
+
+/// Returns the crown route and the first distance it shares with the upper trail
+({ui.Path path, double groundStart, double stemStart}) woodlandCrownTrail(
+  Vector2 size,
+) {
+  final layout = _WoodlandLayout(size);
+  return (
+    path: layout.crownTrail,
+    groundStart: layout.crownGroundStart,
+    stemStart: layout.crownStemStart,
+  );
 }
 
 /// Shares the surface curves between the enclosure art and the walking route
@@ -355,6 +365,13 @@ class _WoodlandLayout {
     trail = ui.Path.from(upperBranch)..extendWithPath(stem, ui.Offset.zero);
     groundStart = trail.computeMetrics().firstOrNull?.length ?? 0;
     trail.extendWithPath(groundTrail, ui.Offset.zero);
+
+    // Reuse the same stem and soil curves so the routes meet without a jump
+    crownStemStart = crownBranch.computeMetrics().firstOrNull?.length ?? 0;
+    crownTrail = ui.Path.from(crownBranch)
+      ..extendWithPath(stem, ui.Offset.zero);
+    crownGroundStart = crownTrail.computeMetrics().firstOrNull?.length ?? 0;
+    crownTrail.extendWithPath(groundTrail, ui.Offset.zero);
   }
 
   late final ui.Path upperBranch;
@@ -364,4 +381,7 @@ class _WoodlandLayout {
   late final ui.Path groundSurface;
   late final ui.Path trail;
   late final double groundStart;
+  late final ui.Path crownTrail;
+  late final double crownStemStart;
+  late final double crownGroundStart;
 }
