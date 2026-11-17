@@ -24,6 +24,7 @@ class StickInsect extends Component with TapCallbacks {
     required this.journal,
     required this.onObserve,
     this.feedingSprigs = const [],
+    this.crownSprig,
   });
 
   /// Builds a continuous contour in scene coordinates for the current viewport
@@ -47,6 +48,9 @@ class StickInsect extends Component with TapCallbacks {
   /// Woodland sprigs in trail order, beginning at the upper branch rest point
   final List<WoodlandSprig> feedingSprigs;
 
+  /// The feeding sprig at the crown branch rest point
+  final WoodlandSprig? crownSprig;
+
   static const _stride = StickInsectWalk.strideLength;
   // The tap area includes the thin legs and antennae so the body is easy to select
   static const _tapBounds = ui.Rect.fromLTRB(-46, -20, 56, 36);
@@ -67,6 +71,7 @@ class StickInsect extends Component with TapCallbacks {
     for (final sprig in feedingSprigs) {
       sprig.place(null, 1);
     }
+    crownSprig?.place(null, 1);
     _trail = null;
     _crownTrail = null;
     if (size.x <= 0 || size.y <= 0) {
@@ -100,6 +105,10 @@ class StickInsect extends Component with TapCallbacks {
           candidate.start < crown.stemStart) {
         _crownTrail = candidate;
         _crownStemStart = crown.stemStart;
+        crownSprig?.place(
+          candidate.tangentAt(candidate.start + 18 * scale),
+          scale,
+        );
       }
     }
     _placeFeedingStops(trail, selectedSprig);
@@ -138,11 +147,18 @@ class StickInsect extends Component with TapCallbacks {
     _walk.configure(
       trail.strides,
       crownStrides: _crownTrail?.strides,
-      hasReturnStops: _feedingStops.length > 1,
       relocatedReturnStop: _walk.returnsToCrown
           ? _sharedStop(relocatedStop)
           : relocatedStop,
     );
+  }
+
+  bool _chooseCrown(bool startedAtCrown) {
+    final upperHasFood = _feedingStops[0]?.feeding.hasLeaf ?? false;
+    final crownHasFood = crownSprig?.feeding.hasLeaf ?? false;
+    // Prefer the branch with food when only one is stocked. Alternate when
+    // both are equally useful so either route remains part of exploration
+    return upperHasFood == crownHasFood ? !startedAtCrown : crownHasFood;
   }
 
   int? _chooseReturnStop() {
@@ -181,7 +197,9 @@ class StickInsect extends Component with TapCallbacks {
 
     final previous = _walk.sample();
     _elapsed += dt;
-    final availableSprig = _feedingStops[previous.feedingStop]?.feeding;
+    final availableSprig = previous.feedingStop == 0 && previous.crown
+        ? crownSprig?.feeding
+        : _feedingStops[previous.feedingStop]?.feeding;
     final meal = _appetite.advance(
       dt,
       leafInReach: availableSprig?.hasLeaf ?? false,
@@ -190,7 +208,13 @@ class StickInsect extends Component with TapCallbacks {
     // selected sprig loses a leaf
     if (meal.bitLeaf) availableSprig?.biteLeaf();
     final mealCompleted = meal.finished && (availableSprig?.eatLeaf() ?? false);
-    if (!meal.feeding) _walk.advance(dt, _chooseReturnStop);
+    if (!meal.feeding) {
+      _walk.advance(
+        dt,
+        chooseCrown: _chooseCrown,
+        chooseReturnStop: _chooseReturnStop,
+      );
+    }
     final current = _walk.sample();
     final previousTrail = previous.crown ? _crownTrail! : upperTrail;
     final currentTrail = current.crown ? _crownTrail! : upperTrail;

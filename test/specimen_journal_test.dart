@@ -308,11 +308,11 @@ void main() {
       find.byType(WoodlandCuttingsTray),
     );
     final upper = tray.sprigs.first;
-    final lower = tray.sprigs.last;
+    final crown = tray.sprigs.last;
     // Seed the fixture before the hunger clock can produce a real observation
     upper.feeding.eatLeaf();
-    lower.feeding.eatLeaf();
-    lower.feeding.biteLeaf();
+    crown.feeding.eatLeaf();
+    crown.feeding.biteLeaf();
 
     Future<void> dropCuttingAt(Offset point) async {
       final source = tester.getCenter(find.text('Drag bramble cutting'));
@@ -329,16 +329,16 @@ void main() {
 
     await dropCuttingAt(const Offset(40, 140));
     expect(upper.feeding.eatenLeaves, 1);
-    expect(lower.feeding.eatenLeaves, 1);
+    expect(crown.feeding.eatenLeaves, 1);
 
-    final target = lower.dropBounds!;
+    final target = crown.dropBounds!;
     // The pointer misses the target. The left edge of the raised preview overlaps it
     final edgeDrop = target.center + const Offset(65, 20);
     expect(target.contains(edgeDrop), isFalse);
     await dropCuttingAt(edgeDrop);
     expect(upper.feeding.eatenLeaves, 1);
-    expect(lower.feeding.eatenLeaves, 0);
-    expect(lower.feeding.hasBite, isFalse);
+    expect(crown.feeding.eatenLeaves, 0);
+    expect(crown.feeding.hasBite, isFalse);
     expect(journal.foodEatenIn('adult'), isEmpty);
     expect(journal.recentActivity, isEmpty);
   });

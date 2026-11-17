@@ -1,12 +1,13 @@
 /// The current stick-insect route schedule, measured in complete strides
 ///
-/// Each cycle leaves one branch, rests on the shared floor, and climbs to
-/// the other branch when available. The contour only changes at floor rest
+/// Each cycle leaves one branch, rests on the shared floor, and chooses
+/// where to climb next. The contour only changes at floor rest
 /// or after completing a full trip
 class StickInsectWalk {
   /// Distance of one complete gait cycle at the reference viewport scale
   static const strideLength = 30.0;
-  static const _walkSpeed = 50.0;
+  static const _walkSpeed = 40.0;
+  static const _rampSeconds = 0.28;
   static const _branchRest = 5.0;
   static const _floorRest = 5.0;
   static const _sprigRest = 0.8;
@@ -14,50 +15,56 @@ class StickInsectWalk {
   int _strideCount = 0;
   int? _crownStrides;
   bool _startsAtCrown = false;
-  bool _hasReturnStops = false;
+  bool _returnsToCrown = false;
   double _phase = 0;
   int? _returnStop;
 
-  bool get returnsToCrown => !_startsAtCrown && _crownStrides != null;
+  bool get returnsToCrown => _returnsToCrown;
   int get _outboundStrides => _startsAtCrown ? _crownStrides! : _strideCount;
   int get _returnStrides => returnsToCrown ? _crownStrides! : _strideCount;
-  double get _outboundTime => _outboundStrides * strideLength / _walkSpeed;
-  double get _returnTime => _returnStrides * strideLength / _walkSpeed;
+  double get _outboundTime => _travelTime(_outboundStrides);
+  double get _returnTime {
+    final stop = _returnStop;
+    return stop == null
+        ? _travelTime(_returnStrides)
+        : _travelTime(stop) + _sprigRest + _travelTime(_returnStrides - stop);
+  }
+
   double get _returnStart => _branchRest + _outboundTime + _floorRest;
-  double get _returnAllowance => _hasReturnStops ? _sprigRest : 0;
-  double get _cycleTime => _returnStart + _returnTime + _returnAllowance;
+  double get _cycleTime => _returnStart + _returnTime;
 
   /// The chosen feeding stop measured in strides from the shared floor rest
   int? get returnStop => _returnStop;
 
   /// Travel time from the floor to a candidate stop on the uphill leg
-  double secondsToReturnStop(int stop) => stop * strideLength / _walkSpeed;
+  double secondsToReturnStop(int stop) => _travelTime(stop);
 
   /// Rescales the route clock and keeps an active meal at its relocated stop
   void configure(
     int strideCount, {
     required int? crownStrides,
-    required bool hasReturnStops,
     required int? relocatedReturnStop,
   }) {
     if (_strideCount == strideCount &&
         _crownStrides == crownStrides &&
-        _hasReturnStops == hasReturnStops &&
         _returnStop == relocatedReturnStop) {
       return;
     }
     final restingAt = sample().feedingStop;
-    final progress = _phase / _cycleTime;
-    if (_strideCount != strideCount ||
-        _crownStrides != crownStrides ||
-        _hasReturnStops != hasReturnStops) {
-      _strideCount = strideCount;
-      _crownStrides = crownStrides;
-      if (crownStrides == null) _startsAtCrown = false;
-      _hasReturnStops = hasReturnStops;
-      _phase = progress * _cycleTime;
+    final wasReturning = _phase >= _returnStart;
+    final progress = wasReturning
+        ? (_phase - _returnStart) / _returnTime
+        : _phase / _returnStart;
+    _strideCount = strideCount;
+    _crownStrides = crownStrides;
+    if (crownStrides == null) {
+      _startsAtCrown = false;
+      _returnsToCrown = false;
     }
     _returnStop = relocatedReturnStop;
+    _phase = wasReturning
+        ? _returnStart + progress * _returnTime
+        : progress * _returnStart;
     if (restingAt == 0 && _phase >= _branchRest) {
       _phase = _branchRest / 2;
     } else if (restingAt != null &&
@@ -70,23 +77,34 @@ class StickInsectWalk {
     }
   }
 
-  /// Advances the route, choosing a sprig once as the insect leaves the floor
+  /// Advances the route and chooses the branch and sprig on departure
   ///
-  /// Reserve the same return time even when there is no stop. The route can
-  /// then change its destination at departure without shifting the floor rest
-  void advance(double seconds, int? Function() chooseReturnStop) {
+  /// Crossing either boundary preserves leftover time. The length of the
+  /// return leg depends on the new destination and any stop along the way
+  void advance(
+    double seconds, {
+    required bool Function(bool startsAtCrown) chooseCrown,
+    required int? Function() chooseReturnStop,
+  }) {
     if (_strideCount == 0) return;
-    final previous = _phase;
-    final next = previous + seconds;
-    final cycles = (next / _cycleTime).floor();
-    _phase = next % _cycleTime;
-    if (cycles > 0) _returnStop = null;
-    // Both routes use the same total travel time across the two legs
-    if (_crownStrides != null && cycles.isOdd) _startsAtCrown = !_startsAtCrown;
-    if (_hasReturnStops &&
-        _phase >= _returnStart &&
-        (cycles > 0 || previous < _returnStart)) {
-      _returnStop = chooseReturnStop();
+    while (seconds > 0) {
+      final departing = _phase < _returnStart;
+      final boundary = departing ? _returnStart : _cycleTime;
+      final remaining = boundary - _phase;
+      if (seconds < remaining) {
+        _phase += seconds;
+        return;
+      }
+      seconds -= remaining;
+      if (departing) {
+        _phase = boundary;
+        _returnsToCrown = _crownStrides != null && chooseCrown(_startsAtCrown);
+        _returnStop = chooseReturnStop();
+      } else {
+        _startsAtCrown = _returnsToCrown;
+        _returnStop = null;
+        _phase = 0;
+      }
     }
   }
 
@@ -107,13 +125,12 @@ class StickInsectWalk {
         returning: false,
         crown: _startsAtCrown,
         moving: false,
-        feedingStop: _startsAtCrown ? null : 0,
+        feedingStop: 0,
       );
     }
     if (phase < floorArrival) {
-      final progress = (phase - _branchRest) / _outboundTime;
       return (
-        strides: _outboundStrides * _ease(progress),
+        strides: _distanceInStrides(phase - _branchRest, _outboundStrides),
         returning: false,
         crown: _startsAtCrown,
         moving: true,
@@ -137,7 +154,7 @@ class StickInsectWalk {
       final timeToSprig = secondsToReturnStop(stop);
       if (returnTime < timeToSprig) {
         return (
-          strides: stop * _ease(returnTime / timeToSprig),
+          strides: _distanceInStrides(returnTime, stop),
           returning: true,
           crown: returnsToCrown,
           moving: true,
@@ -154,19 +171,16 @@ class StickInsectWalk {
           feedingStop: stop,
         );
       }
-      final remainingTime = _returnTime - timeToSprig;
       return (
-        strides:
-            stop + (_returnStrides - stop) * _ease(afterRest / remainingTime),
+        strides: stop + _distanceInStrides(afterRest, _returnStrides - stop),
         returning: true,
         crown: returnsToCrown,
         moving: true,
         feedingStop: null,
       );
     }
-    final progress = returnTime / (_returnTime + _returnAllowance);
     return (
-      strides: _returnStrides * _ease(progress),
+      strides: _distanceInStrides(returnTime, _returnStrides),
       returning: true,
       crown: returnsToCrown,
       moving: true,
@@ -174,6 +188,20 @@ class StickInsectWalk {
     );
   }
 
-  // Smoothstep gives the body zero speed at the start and end of each walk
-  static double _ease(double t) => t * t * (3 - 2 * t);
+  static double _travelTime(int strides) =>
+      strides == 0 ? 0 : strides * strideLength / _walkSpeed + _rampSeconds;
+
+  // Integrate a short linear speed ramp at each end and cruise in between.
+  // Each ramp covers half the distance a full-speed tick would cover
+  static double _distanceInStrides(double seconds, int strides) {
+    final rate = _walkSpeed / strideLength;
+    final left = _travelTime(strides) - seconds;
+    if (seconds < _rampSeconds) {
+      return rate * seconds * seconds / (2 * _rampSeconds);
+    }
+    if (left < _rampSeconds) {
+      return strides - rate * left * left / (2 * _rampSeconds);
+    }
+    return rate * (seconds - _rampSeconds / 2);
+  }
 }
