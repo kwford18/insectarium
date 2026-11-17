@@ -2,6 +2,7 @@
 
 ## Code and documentation
 
+- Keep files focused on one responsibility. Split simulation rules, rendering, input, and persistence at clear boundaries when their logic grows
 - Use comments to explain why code exists, how a non-obvious part works, or what constraint the code preserves
 - Keep comments selective. For every code comment and doc comment, omit a period, question mark, or exclamation mark at the end of the comment. Use normal punctuation within the comment
 - Prefer descriptive headings and unnumbered lists in comments and documentation. Use numbering only when it makes a required order materially clearer
