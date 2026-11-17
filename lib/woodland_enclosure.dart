@@ -313,7 +313,7 @@ class WoodlandEnclosure extends Component {
 
 /// Returns the current route and the distance along it where the floor begins
 ///
-/// The prototype follows the upper branch, stem, and right-hand soil edge as
+/// The prototype uses the upper branch, stem, and right-hand soil edge as
 /// one contour. The crown branch and the left side of the floor are drawn too
 /// and aren't part of this route
 ({ui.Path path, double groundStart}) woodlandTrail(Vector2 size) {

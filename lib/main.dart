@@ -9,7 +9,9 @@ import 'specimen_journal.dart';
 import 'specimen_journal_view.dart';
 import 'stick_insect.dart';
 import 'woodland_enclosure.dart';
+import 'woodland_feeding.dart';
 
+const _feedingOverlay = 'woodlandFeeding';
 const _journalOverlay = 'specimenJournal';
 // Keep the original key readable for saves from the single-specimen prototype
 const _legacyJournalKey = 'woodland.stickInsect.journal.v1';
@@ -74,12 +76,38 @@ class SanctuaryApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: GameWidget(
         game: _game,
+        initialActiveOverlays: const [_feedingOverlay],
         overlayBuilderMap: {
+          _feedingOverlay: (_, _) => _OfferLeafButton(feeding: _game.feeding),
           _journalOverlay: (_, _) => SpecimenJournalView(
             journal: _game.journal,
             onClose: () => _game.overlays.remove(_journalOverlay),
           ),
         },
+      ),
+    );
+  }
+}
+
+// Keep the control outside the Flame scene so it uses Flutter's button semantics
+class _OfferLeafButton extends StatelessWidget {
+  const _OfferLeafButton({required this.feeding});
+
+  final WoodlandFeeding feeding;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+      child: Align(
+        alignment: Alignment.bottomRight,
+        child: ListenableBuilder(
+          listenable: feeding,
+          builder: (context, _) => FilledButton(
+            onPressed: feeding.hasLeaf ? null : feeding.offerLeaf,
+            child: Text(feeding.hasLeaf ? 'Leaf offered' : 'Offer leaf'),
+          ),
+        ),
       ),
     );
   }
@@ -95,12 +123,14 @@ class _TerrariumGame extends FlameGame {
         trailPath: woodlandTrail,
         journal: journal,
         onObserve: () => overlays.add(_journalOverlay),
+        feeding: feeding,
       ),
       WoodlandEnclosure(foreground: true),
     ]);
   }
 
   final SpecimenJournal journal;
+  final feeding = WoodlandFeeding();
 
   @override
   void lifecycleStateChange(AppLifecycleState state) {

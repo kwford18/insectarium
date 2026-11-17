@@ -223,8 +223,14 @@ void main() {
       expect(find.text('Specimen journal'), findsNothing);
       expect(journal.recentActivity, isEmpty);
 
-      // Advance the live Flame walk while the journal overlay is closed
-      for (var frame = 0; frame < 115; frame++) {
+      // Advance until the insect reaches its floor rest, independent of the
+      // exact timing of the outbound walk
+      for (
+        var frame = 0;
+        frame < 200 &&
+            !journal.facts.contains('Has rested on the enclosure floor.');
+        frame++
+      ) {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(journal.behaviorLabel, 'Resting');
@@ -259,4 +265,26 @@ void main() {
       expect(find.text('Reached the leaf litter'), findsNothing);
     },
   );
+
+  testWidgets('offering a leaf records one completed meal', (tester) async {
+    final journal = SpecimenJournal(specimen: woodlandStickInsect);
+    addTearDown(journal.dispose);
+    await tester.pumpWidget(SanctuaryApp(journal: journal));
+    await tester.pump(const Duration(milliseconds: 16));
+
+    await tester.tap(find.text('Offer leaf'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Leaf offered'), findsOneWidget);
+    expect(journal.behaviorLabel, 'Feeding');
+    expect(journal.foodEatenIn('adult'), isEmpty);
+
+    // Let the insect finish while the journal is closed, then give the
+    // simulation another moment to catch accidental duplicate records
+    for (var frame = 0; frame < 25; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Offer leaf'), findsOneWidget);
+    expect(journal.foodEatenIn('adult')['bramble-leaf']?.count, 1);
+    expect(journal.recentActivity.single.message, 'Ate Bramble leaf · Adult');
+  });
 }

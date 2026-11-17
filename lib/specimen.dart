@@ -52,6 +52,7 @@ const woodlandStickInsect = Specimen(
     initialStageId: 'adult',
     stages: {'adult': LifeStageDefinition('Adult')},
     behaviors: {
+      'feeding': 'Feeding',
       'resting': 'Resting',
       'climbing': 'Climbing',
       'walking': 'Walking',
