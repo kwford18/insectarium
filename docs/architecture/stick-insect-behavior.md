@@ -2,6 +2,8 @@
 
 The woodland stick insect starts on the upper branch. On leaving the floor, it takes the branch with food if only one branch is stocked. When both branches have the same food availability, it alternates. Both routes follow the same stem and soil curves. Their stride grids are measured from the same floor rest, so the insect stays in place when it turns uphill. The route clock lives in `StickInsectWalk` and uses a steady walking pace with short ramps into and out of stops. The Flame component maps that clock onto the enclosure geometry, renders the gait, and reports observations through the existing journal API.
 
+During a longer rest the insect gives two small rocks. The sway changes the body angle and hip positions while foot contacts stay on the same points along the branch or soil. Brief stops on the shared stem are too short to trigger it, and the sway settles when feeding starts.
+
 The prototype starts with four edible leaves on each of four sprigs. Each branch rest point has a sprig, and two more lie along the climb back from the floor. Hunger advances as the insect explores. At departure from the floor it chooses the first reachable sprig with leaves where it expects to be hungry on arrival. A crown-bound insect can stop at sprigs along the shared stem. It keeps its choice for the climb so the gait stays continuous. It can also feed at either branch rest point. A notch appears partway through the meal. On completion, the leaf disappears and the journal receives one `FoodEaten` observation. The sprigs start fresh on reload. The journal persists completed feedings independently.
 
 Drag a bramble cutting from the bottom tray to a marked stem to replace that sprig's leaves. Any overlap between the cutting preview and the stem marker counts. If two markers overlap the preview, the closest stem receives the cutting. The tray provides as many cuttings as needed for this prototype. A missed drop leaves the sprigs alone. Replanting only changes the sprig's food state, so the journal still records completed meals.
@@ -16,8 +18,8 @@ Plant care should happen through the enclosure itself. The cutting prototype giv
 
 ## Follow-up behavior work
 
+- Revise the stick insect's wiggle first. Rock the body back and forth while keeping its height steady. Make this part of its ordinary movement, with some walking bouts including a wiggle and others using the regular gait. Give it a distinct resting state in which the wiggle loops until it leaves that state, with its feet planted throughout. It can also rest completely still.
 - Let the insect choose when and where to rest or explore, including upper and crown branch destinations
 - Extend feeding to more of the shrub, then test how players decide when and where to replant
 - Add a turn animation and tune travel and rest timing in the enclosure
-- Add a subtle phasmid wiggle while paused, keeping the feet anchored to the surface
 - Develop another species with its own feeding or movement rules before extracting behavior shared by both

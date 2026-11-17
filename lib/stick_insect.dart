@@ -8,6 +8,7 @@ import 'specimen_journal.dart';
 import 'specimen_observation.dart';
 import 'stick_insect_appetite.dart';
 import 'stick_insect_art.dart';
+import 'stick_insect_sway.dart';
 import 'stick_insect_trail.dart';
 import 'stick_insect_walk.dart';
 import 'woodland_feeding.dart';
@@ -62,6 +63,7 @@ class StickInsect extends Component with TapCallbacks {
   String? _reportedBehavior;
   final _walk = StickInsectWalk();
   final _appetite = StickInsectAppetite();
+  final _sway = StickInsectSway();
   final _feedingStops = <int, WoodlandSprig>{};
 
   @override
@@ -216,6 +218,17 @@ class StickInsect extends Component with TapCallbacks {
       );
     }
     final current = _walk.sample();
+    // Short feeding stops and the arrival tick do not count as a settled rest
+    _sway.advance(
+      dt,
+      resting:
+          !meal.feeding &&
+          !previous.moving &&
+          !current.moving &&
+          previous.crown == current.crown &&
+          previous.returning == current.returning &&
+          previous.strides == current.strides,
+    );
     final previousTrail = previous.crown ? _crownTrail! : upperTrail;
     final currentTrail = current.crown ? _crownTrail! : upperTrail;
     final wasOnGround =
@@ -339,13 +352,25 @@ class StickInsect extends Component with TapCallbacks {
     double strides,
     bool returning,
   ) {
-    // Distance drives the gait so the legs slow down with the eased body motion.
-    // Two bobs per stride follow the two alternating sets of feet
+    // Distance drives the bob during walking. During a rest, sway moves the
+    // body and hips while the renderer still samples feet from the route
     final tangent = trail.tangentAt(trail.distanceAt(strides, returning));
     final forward = tangent.vector;
     final bob = (1 - math.cos(strides * math.pi * 4)) * 0.6;
-    final body = tangent.position + _up(forward) * ((27 + bob) * trail.scale);
-    return (body, forward);
+    final sway = _sway.sample();
+    final body =
+        tangent.position +
+        _up(forward) * ((27 + bob + sway.offset) * trail.scale);
+    if (sway.angle == 0) return (body, forward);
+    final cos = math.cos(sway.angle);
+    final sin = math.sin(sway.angle);
+    return (
+      body,
+      ui.Offset(
+        forward.dx * cos - forward.dy * sin,
+        forward.dx * sin + forward.dy * cos,
+      ),
+    );
   }
 
   // In a y-down canvas, a right-facing tangent gives an upward normal

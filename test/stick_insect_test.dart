@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
@@ -39,7 +40,7 @@ void main() {
     expect((third - second) * 30, closeTo(80, 0.001));
   });
 
-  test('all six feet rest on the soil line after the walk', () async {
+  test('a resting insect sways with all six feet on the soil line', () async {
     final journal = SpecimenJournal(specimen: woodlandStickInsect);
     addTearDown(journal.dispose);
     // A horizontal route isolates foot height from the real scene's curves.
@@ -58,25 +59,46 @@ void main() {
           ..onGameResize(Vector2(400, 760))
           ..update(12);
 
-    // Render just the insect so alpha on the soil line comes from a foot stroke
-    final recorder = ui.PictureRecorder();
-    insect.render(ui.Canvas(recorder));
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(400, 760);
-    addTearDown(picture.dispose);
-    addTearDown(image.dispose);
-    final pixels = (await image.toByteData())!;
+    Future<ByteData> renderInsect() async {
+      // Render just the insect so alpha on the soil line comes from a foot stroke
+      final recorder = ui.PictureRecorder();
+      insect.render(ui.Canvas(recorder));
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(400, 760);
+      addTearDown(picture.dispose);
+      addTearDown(image.dispose);
+      return (await image.toByteData())!;
+    }
+
+    final settled = await renderInsect();
+    insect.update(1.95);
+    final swaying = await renderInsect();
 
     // Sample the row just above y=500, allowing one neighboring column and a
     // small alpha tolerance for antialiasing at each expected foot position
-    for (final x in [296, 304, 311, 333, 340, 348]) {
-      final covered = [
-        x - 1,
-        x,
-        x + 1,
-      ].any((column) => pixels.getUint8((499 * 400 + column) * 4 + 3) > 30);
-      expect(covered, isTrue, reason: 'No foot contact near x=$x');
+    for (final frame in [settled, swaying]) {
+      for (final x in [296, 304, 311, 333, 340, 348]) {
+        final covered = [
+          x - 1,
+          x,
+          x + 1,
+        ].any((column) => frame.getUint8((499 * 400 + column) * 4 + 3) > 30);
+        expect(covered, isTrue, reason: 'No foot contact near x=$x');
+      }
     }
+
+    // The thorax region excludes the antennae, which already move on their own
+    var changedPixels = 0;
+    for (var y = 466; y < 479; y++) {
+      for (var x = 307; x < 333; x++) {
+        final alpha = (y * 400 + x) * 4 + 3;
+        if (settled.getUint8(alpha) != swaying.getUint8(alpha)) {
+          changedPixels++;
+        }
+      }
+    }
+    expect(changedPixels, greaterThan(10));
+    expect(journal.behaviorLabel, 'Resting');
   });
 
   test('a hungry insect can eat at the lower sprig on its return', () {
